@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조연재 — 메인 시안 (시냅스 프로토타입)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400&family=Silkscreen:wght@400&display=swap">
+<style>
+body{margin:0;background:#1C1B1F;font-family:'IBM Plex Sans KR',sans-serif;font-weight:400;color:#EEE9EB}
+a{color:#9E999D;text-decoration:none;transition:color .2s}a:hover{color:#EEE9EB}
+@keyframes drift{0%,100%{transform:translate(0,0)}50%{transform:translate(-16px,8px)}}
+.drift{animation:drift 22s steps(24) infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(4);opacity:0}}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2.6s steps(8) infinite}
+@keyframes travel{from{offset-distance:0%}to{offset-distance:100%}}
+.sig{position:absolute;left:0;top:0;width:6px;height:6px;background:#E0306A;animation:travel 9s steps(180) infinite}
+.s1{offset-path:path('M137 456 L299 514 L475 517 L578 371 L767 345 L958 394 L1143 457 L1323 409')}
+.s2{offset-path:path('M152 131 L293 241 L405 346 L578 371 L767 345 L740 542 L887 591 L888 799 L1027 741');animation-duration:11s}
+.s3{offset-path:path('M1349 96 L1193 286 L1033 257 L919 117 L757 174 L638 63 L487 178 L364 84 L152 131');animation-duration:13s}
+.s4{offset-path:path('M90 802 L296 676 L467 697 L620 705 L728 820 L888 799 L1027 741 L1169 797 L1351 790');animation-duration:10s}
+@keyframes eq{0%{transform:scaleY(.25)}100%{transform:scaleY(1)}}
+.bar{display:block;width:3px;height:12px;background:#E0306A;transform-origin:bottom;transform:scaleY(.25)}
+.bar.on{animation:eq .8s steps(4) infinite alternate}
+@media (prefers-reduced-motion:reduce){.drift,.pulse,.sig,.bar.on{animation:none}}
+html,body{height:100%}
+.stage{position:fixed;inset:0;overflow:hidden;background-color:#1C1B1F;background-image:radial-gradient(#2E2C32 1px,transparent 1.5px);background-size:16px 16px}
+.field{position:absolute;left:50%;top:50%;width:1440px;height:900px;transform:translate(-50%,-50%) scale(var(--s,1))}
+header{position:fixed;left:48px;right:48px;top:32px;height:44px;display:flex;align-items:center;justify-content:space-between;z-index:2}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;color:#EEE9EB}
+.logo i{display:block;width:8px;height:8px;background:#E0306A}
+.right{display:flex;align-items:center;gap:36px}
+nav{display:flex;gap:28px;font-size:14px}
+.snd{height:44px;padding:0 4px;display:flex;gap:10px;align-items:center;background:transparent;border:0;color:#9E999D;font-family:Silkscreen,monospace;font-size:11px;letter-spacing:.06em;cursor:pointer}
+.eq{display:flex;gap:2px;align-items:flex-end;height:12px}
+footer{position:fixed;left:48px;right:48px;bottom:32px;display:flex;align-items:center;justify-content:space-between;z-index:2}
+footer .cap{font-size:13px;color:#9E999D}
+footer .lbl{font-family:Silkscreen,monospace;font-size:11px;letter-spacing:.08em;color:#9E999D}
+@media (max-width:640px){
+header{left:24px;right:24px;top:20px}footer{left:24px;right:24px;bottom:24px}
+.right{gap:16px}nav{gap:16px;font-size:13px}
+footer .cap{font-size:12px}footer .lbl{display:none}
+}
+</style>
+</head>
+<body>
+<div class="stage" aria-hidden="true">
+<div class="field">
+<div class="drift" style="position: absolute; left: 0; top: 0; width: 1440px; height: 900px">
+<svg width="1440" height="900" viewBox="0 0 1440 900" style="position: absolute; left: 0; top: 0" shape-rendering="crispEdges" aria-hidden="true">
+<g stroke="#4A474E" stroke-width="2" stroke-dasharray="2 6">
+<line x1="487" y1="178" x2="405" y2="346"></line><line x1="487" y1="178" x2="364" y2="84"></line><line x1="487" y1="178" x2="638" y2="63"></line><line x1="919" y1="117" x2="757" y2="174"></line><line x1="919" y1="117" x2="1033" y2="257"></line><line x1="919" y1="117" x2="1072" y2="92"></line><line x1="767" y1="345" x2="958" y2="394"></line><line x1="767" y1="345" x2="740" y2="542"></line><line x1="767" y1="345" x2="578" y2="371"></line><line x1="767" y1="345" x2="757" y2="174"></line><line x1="137" y1="456" x2="299" y2="514"></line><line x1="137" y1="456" x2="140" y2="607"></line><line x1="137" y1="456" x2="97" y2="278"></line><line x1="152" y1="131" x2="293" y2="241"></line><line x1="152" y1="131" x2="97" y2="278"></line><line x1="152" y1="131" x2="364" y2="84"></line><line x1="620" y1="705" x2="467" y2="697"></line><line x1="620" y1="705" x2="740" y2="542"></line><line x1="620" y1="705" x2="728" y2="820"></line><line x1="620" y1="705" x2="541" y2="833"></line><line x1="888" y1="799" x2="887" y2="591"></line><line x1="888" y1="799" x2="728" y2="820"></line><line x1="888" y1="799" x2="1027" y2="741"></line><line x1="1349" y1="96" x2="1193" y2="286"></line><line x1="1349" y1="96" x2="1343" y2="254"></line><line x1="1349" y1="96" x2="1072" y2="92"></line><line x1="1193" y1="286" x2="1323" y2="409"></line><line x1="1193" y1="286" x2="1033" y2="257"></line><line x1="1193" y1="286" x2="1143" y2="457"></line><line x1="1193" y1="286" x2="1343" y2="254"></line><line x1="1193" y1="286" x2="1072" y2="92"></line><line x1="467" y1="697" x2="475" y2="517"></line><line x1="467" y1="697" x2="296" y2="676"></line><line x1="467" y1="697" x2="341" y2="820"></line><line x1="467" y1="697" x2="541" y2="833"></line><line x1="299" y1="514" x2="475" y2="517"></line><line x1="299" y1="514" x2="140" y2="607"></line><line x1="299" y1="514" x2="296" y2="676"></line><line x1="958" y1="394" x2="1033" y2="257"></line><line x1="958" y1="394" x2="1143" y2="457"></line><line x1="475" y1="517" x2="578" y2="371"></line><line x1="475" y1="517" x2="405" y2="346"></line><line x1="1109" y1="605" x2="1169" y2="797"></line><line x1="1109" y1="605" x2="1318" y2="599"></line><line x1="1109" y1="605" x2="1143" y2="457"></line><line x1="1109" y1="605" x2="1027" y2="741"></line><line x1="1169" y1="797" x2="1351" y2="790"></line><line x1="1169" y1="797" x2="1027" y2="741"></line><line x1="140" y1="607" x2="90" y2="802"></line><line x1="140" y1="607" x2="296" y2="676"></line><line x1="293" y1="241" x2="405" y2="346"></line><line x1="293" y1="241" x2="97" y2="278"></line><line x1="293" y1="241" x2="364" y2="84"></line><line x1="1318" y1="599" x2="1323" y2="409"></line><line x1="1318" y1="599" x2="1351" y2="790"></line><line x1="740" y1="542" x2="887" y2="591"></line><line x1="578" y1="371" x2="405" y2="346"></line><line x1="90" y1="802" x2="296" y2="676"></line><line x1="90" y1="802" x2="341" y2="820"></line><line x1="757" y1="174" x2="638" y2="63"></line><line x1="1323" y1="409" x2="1143" y2="457"></line><line x1="1323" y1="409" x2="1343" y2="254"></line><line x1="296" y1="676" x2="341" y2="820"></line><line x1="364" y1="84" x2="638" y2="63"></line><line x1="887" y1="591" x2="1027" y2="741"></line><line x1="1033" y1="257" x2="1072" y2="92"></line><line x1="341" y1="820" x2="541" y2="833"></line><line x1="728" y1="820" x2="541" y2="833"></line>
+</g>
+<g fill="#8A858C">
+<rect x="484" y="175" width="6" height="6"></rect><rect x="916" y="114" width="6" height="6"></rect><rect x="764" y="342" width="6" height="6"></rect><rect x="149" y="128" width="6" height="6"></rect><rect x="617" y="702" width="6" height="6"></rect><rect x="885" y="796" width="6" height="6"></rect><rect x="1346" y="93" width="6" height="6"></rect><rect x="1190" y="283" width="6" height="6"></rect><rect x="296" y="511" width="6" height="6"></rect><rect x="955" y="391" width="6" height="6"></rect><rect x="472" y="514" width="6" height="6"></rect><rect x="1106" y="602" width="6" height="6"></rect><rect x="137" y="604" width="6" height="6"></rect><rect x="290" y="238" width="6" height="6"></rect><rect x="1315" y="596" width="6" height="6"></rect><rect x="737" y="539" width="6" height="6"></rect><rect x="575" y="368" width="6" height="6"></rect><rect x="87" y="799" width="6" height="6"></rect><rect x="402" y="343" width="6" height="6"></rect><rect x="94" y="275" width="6" height="6"></rect><rect x="1320" y="406" width="6" height="6"></rect><rect x="293" y="673" width="6" height="6"></rect><rect x="361" y="81" width="6" height="6"></rect><rect x="1030" y="254" width="6" height="6"></rect><rect x="1348" y="787" width="6" height="6"></rect><rect x="1140" y="454" width="6" height="6"></rect><rect x="1340" y="251" width="6" height="6"></rect><rect x="338" y="817" width="6" height="6"></rect><rect x="725" y="817" width="6" height="6"></rect><rect x="538" y="830" width="6" height="6"></rect><rect x="635" y="60" width="6" height="6"></rect><rect x="1024" y="738" width="6" height="6"></rect>
+</g>
+<g fill="#E0306A">
+<rect x="132" y="451" width="10" height="10"></rect><rect x="462" y="692" width="10" height="10"></rect><rect x="1164" y="792" width="10" height="10"></rect><rect x="752" y="169" width="10" height="10"></rect><rect x="882" y="586" width="10" height="10"></rect><rect x="1067" y="87" width="10" height="10"></rect>
+</g>
+<g fill="none" stroke="#E0306A" stroke-width="2">
+<rect class="pulse" x="132" y="451" width="10" height="10"></rect><rect class="pulse" x="462" y="692" width="10" height="10" style="animation-delay: .8s"></rect><rect class="pulse" x="1164" y="792" width="10" height="10" style="animation-delay: 1.6s"></rect><rect class="pulse" x="752" y="169" width="10" height="10" style="animation-delay: .4s"></rect><rect class="pulse" x="882" y="586" width="10" height="10" style="animation-delay: 1.2s"></rect><rect class="pulse" x="1067" y="87" width="10" height="10" style="animation-delay: 2s"></rect>
+</g>
+</svg>
+<span class="sig s1" style="animation-delay: 0s"></span><span class="sig s1" style="animation-delay: .15s; opacity: .55"></span><span class="sig s1" style="animation-delay: .3s; opacity: .25"></span>
+<span class="sig s2" style="animation-delay: -4s"></span><span class="sig s2" style="animation-delay: -3.85s; opacity: .55"></span><span class="sig s2" style="animation-delay: -3.7s; opacity: .25"></span>
+<span class="sig s3" style="animation-delay: -2s"></span><span class="sig s3" style="animation-delay: -1.85s; opacity: .55"></span><span class="sig s3" style="animation-delay: -1.7s; opacity: .25"></span>
+<span class="sig s4" style="animation-delay: -6s"></span><span class="sig s4" style="animation-delay: -5.85s; opacity: .55"></span><span class="sig s4" style="animation-delay: -5.7s; opacity: .25"></span>
+</div>
+</div>
+</div>
+<header>
+<a class="logo" href="#"><i></i>조연재</a>
+<div class="right">
+<nav>
+<a href="#">소개</a>
+<a href="#">포트폴리오</a>
+<a href="#">그 외 작업물</a>
+</nav>
+<button class="snd" id="snd" aria-pressed="false" aria-label="배경음악 켜고 끄기">
+<span class="eq"><span class="bar" style="animation-delay:0s"></span><span class="bar" style="animation-delay:.25s"></span><span class="bar" style="animation-delay:.5s"></span></span>
+<span id="sndLabel">SOUND OFF</span>
+</button>
+</div>
+</header>
+<footer>
+<span class="cap">게임 연구 · 사용자 연구 · 시각 디자인</span>
+<span class="lbl">SCROLL</span>
+</footer>
+<script>
+// 화면 크기에 맞춰 1440x900 연결망을 꽉 채우도록 확대/축소
+function fit(){
+  var s=Math.max(window.innerWidth/1440,window.innerHeight/900);
+  document.querySelector('.field').style.setProperty('--s',s);
+}
+window.addEventListener('resize',fit);fit();
+// 사운드 버튼 (실제 음원 연결은 구현 단계에서)
+var btn=document.getElementById('snd'),on=false;
+btn.addEventListener('click',function(){
+  on=!on;
+  btn.setAttribute('aria-pressed',on);
+  document.getElementById('sndLabel').textContent=on?'SOUND ON':'SOUND OFF';
+  btn.querySelectorAll('.bar').forEach(function(b){b.classList.toggle('on',on);});
+});
+</script>
+</body>
+</html>

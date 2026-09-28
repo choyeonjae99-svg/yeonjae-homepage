@@ -1,0 +1,190 @@
+---
+/*
+ * 임시 페이지 — 1단계(디자인 토큰) 확인용.
+ * 2단계에서 공통 레이아웃, 3단계에서 시냅스 메인으로 교체한다.
+ */
+import BaseHead from '../components/BaseHead.astro';
+
+const colors = [
+  ['--color-bg', '차콜 블랙', '#1C1B1F', '배경'],
+  ['--color-accent', '로즈 마젠타', '#E0306A', '포인트·신호·큰 강조'],
+  ['--color-accent-light', '밝은 자홍', '#F26D9A', '작은 자홍 글씨·링크 호버'],
+  ['--color-accent-deep', '딥 와인', '#9E1F4A', '보조 강조·눌림'],
+  ['--color-surface', '표면', '#26252A', '카드 배경'],
+  ['--color-border', '구분선', '#38363C', '테두리'],
+  ['--color-dot', '도트/연결선', '#4A474E', '픽셀 점선·비활성 도트'],
+  ['--color-node', '비활성 노드', '#8A858C', '회색 픽셀 노드'],
+  ['--color-text-muted', '보조 글씨', '#9E999D', '메뉴·캡션'],
+  ['--color-text', '본문 글씨', '#EEE9EB', '이름·본문'],
+];
+
+const spaces = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-5', '--space-6', '--space-7', '--space-8', '--space-9'];
+---
+
+<html lang="ko">
+  <head>
+    <BaseHead title="디자인 토큰" />
+  </head>
+  <body>
+    <main class="sheet">
+      <p class="pixel-label">Design tokens · step 1</p>
+      <h1 class="page-title">디자인 토큰 확인</h1>
+
+      <section>
+        <h2 class="pixel-label">Color</h2>
+        <ul class="swatches">
+          {colors.map(([v, name, hex, use]) => (
+            <li>
+              <span class="chip" style={`background: var(${v})`}></span>
+              <span>{name}</span>
+              <span class="caption">{hex} · {use}</span>
+              <code class="caption">{v}</code>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="pixel-label">Type</h2>
+        <div class="type">
+          <p class="page-title">하위 페이지 제목 32px</p>
+          <p class="logo"><i></i>조연재</p>
+          <p>본문 16px, 행간 1.7. 굵기는 400 하나로 통일하고 위계는 크기와 색으로만 만든다. <a class="link" href="#">본문 링크</a></p>
+          <p class="menu">메뉴 14px — 마우스를 올리면 밝아짐</p>
+          <p class="caption">캡션 13px · 게임 연구 · 사용자 연구 · 시각 디자인</p>
+          <p class="pixel-label">Sound off · Scroll · 2026</p>
+          <p><strong>strong 태그도 400으로 보여야 함</strong></p>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="pixel-label">Pixel</h2>
+        <div class="pixels">
+          <span class="node"></span>
+          <span class="node accent"></span>
+          <span class="dash"></span>
+          <span class="node accent pulse"></span>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="pixel-label">Spacing</h2>
+        <ul class="spaces">
+          {spaces.map((v) => (
+            <li><span class="bar" style={`width: var(${v})`}></span><code class="caption">{v}</code></li>
+          ))}
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  .sheet {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: var(--space-8) var(--gutter);
+    display: grid;
+    gap: var(--space-7);
+  }
+  section {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .swatches {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+  .swatches li {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .chip {
+    height: 48px;
+    border: 1px solid var(--color-border);
+    margin-bottom: var(--space-2);
+  }
+  .type {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--text-name);
+  }
+  .logo i {
+    width: var(--pixel-logo);
+    height: var(--pixel-logo);
+    background: var(--color-accent);
+  }
+  .link {
+    color: var(--color-accent-light);
+  }
+  .link:hover {
+    color: var(--color-text);
+  }
+  .menu {
+    font-size: var(--text-menu);
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .menu:hover {
+    color: var(--color-text);
+  }
+  .pixels {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    height: 64px;
+  }
+  .node {
+    width: var(--pixel-node);
+    height: var(--pixel-node);
+    background: var(--color-node);
+  }
+  .node.accent {
+    width: var(--pixel-node-accent);
+    height: var(--pixel-node-accent);
+    background: var(--color-accent);
+  }
+  .dash {
+    width: 160px;
+    height: var(--dash-width);
+    background: repeating-linear-gradient(
+      90deg,
+      var(--color-dot) 0 var(--dash-on),
+      transparent var(--dash-on) calc(var(--dash-on) + var(--dash-off))
+    );
+  }
+  .pulse {
+    outline: 2px solid var(--color-accent);
+    animation: pulse 2.6s var(--step-med) infinite;
+  }
+  @keyframes pulse {
+    0% { outline-offset: 0; outline-color: rgb(224 48 106 / 0.9); }
+    100% { outline-offset: 14px; outline-color: rgb(224 48 106 / 0); }
+  }
+  .spaces {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .spaces li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+  .bar {
+    height: 8px;
+    background: var(--color-accent);
+  }
+</style>

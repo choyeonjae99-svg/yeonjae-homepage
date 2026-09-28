@@ -1,0 +1,28 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const SITE_NAME = '조연재';
+const { title, description = '게임 연구 · 사용자 연구 · 시각 디자인' } = Astro.props;
+const fullTitle = title ? `${title} — ${SITE_NAME}` : SITE_NAME;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1C1B1F" />
+<meta name="color-scheme" content="dark" />
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+<!-- 폰트: 굵기 400 하나만 불러온다 -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400&family=Silkscreen:wght@400&display=swap"
+/>
