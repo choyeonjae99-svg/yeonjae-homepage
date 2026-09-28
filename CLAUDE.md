@@ -163,7 +163,7 @@ summary: 카드에 보일 한 줄 설명
 
 - **프레임워크:** Astro (정적 사이트, 콘텐츠 컬렉션 지원, 빠름). 다른 선택이 더 낫다면 이유를 설명하고 제안할 것.
 - **그래픽:** Canvas 2D (필요 시 Three.js)
-- **호스팅:** Vercel 또는 Netlify 무료 플랜 + GitHub 연동 자동 배포
+- **호스팅:** Vercel 무료 플랜 + GitHub 연동 자동 배포 (주인이 Vercel 선택)
 - **도메인:** 나중에 개인 도메인 연결 (예: yeonjae.com)
 
 ## 8. 주의사항
@@ -184,7 +184,7 @@ summary: 카드에 보일 한 줄 설명
 6. [x] 포트폴리오 목록(연구/디자인 탭) + 상세 — `src/pages/portfolio/`, 카드는 `PortfolioCard.astro`
 7. [x] 그 외 작업물 목록(글/그림 필터) + 상세 — `src/pages/works/`, 내용은 `src/content/works/{writing,drawing}/`
 8. [x] 반응형·접근성 점검, 이미지 최적화 — 360~1920px 7개 폭 가로 넘침 0, axe(WCAG 2.1 AA) 위반 0, 터치 영역 44px 이상, 키보드·움직임 줄이기 확인. 공유 이미지 `public/og.png`, 404 페이지
-9. [ ] 배포 + 도메인 연결 — 도메인이 정해지면 `astro.config.mjs` 의 `site` 를 실제 주소로 바꾼다(공유 미리보기 이미지·canonical 주소가 이 값을 쓴다)
+9. [ ] 배포 + 도메인 연결 — **Vercel** (GitHub `main` 자동 배포). `astro.config.mjs` 의 `site` 는 Vercel 운영 도메인(`VERCEL_PROJECT_PRODUCTION_URL`)을 자동으로 쓰므로, 개인 도메인을 연결하면 다음 배포부터 공유 미리보기 주소도 바뀐다. 따로 지정하려면 `SITE_URL` 환경변수
 
 ## 10. 아직 받아야 할 자료
 

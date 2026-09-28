@@ -28,3 +28,12 @@ public/
   images/             썸네일, 상세 이미지
 docs/                 디자인 시안
 ```
+
+## 배포 (Vercel)
+
+`main` 브랜치에 커밋이 올라가면 Vercel 이 자동으로 빌드·배포한다.
+프레임워크는 Astro 로 자동 인식되고, 빌드 명령 `npm run build`, 출력 폴더 `dist` 이다.
+
+- 공유 미리보기(Open Graph) 주소는 Vercel 운영 도메인을 자동으로 쓴다.
+  개인 도메인을 Vercel 에 연결하면 다음 배포부터 그 도메인이 들어간다.
+- 주소를 직접 정하려면 Vercel 환경변수 `SITE_URL` (예: `https://yeonjae.com`).
