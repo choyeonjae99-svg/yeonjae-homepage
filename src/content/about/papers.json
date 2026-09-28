@@ -1,0 +1,51 @@
+[
+  {
+    "id": "thesis-2026",
+    "type": "thesis",
+    "title": "아바타-이용자 간 관계 변화를 통한 유동적 동일시 유형 연구",
+    "subtitle": "마비노기 모바일 이용자를 중심으로",
+    "authors": ["조연재"],
+    "venue": "경희대학교 대학원 실감AX융합학과 석사학위논문",
+    "year": 2026,
+    "summary": "게임 내 현장 인터뷰(n=5)와 설문(n=117)을 결합한 혼합방법 설계. 탐색적 요인분석, K-means 클러스터링으로 3개 유저 세그먼트를 도출하고 T-Test, ANOVA, 회귀분석으로 검증했다.",
+    "keywords": ["아바타", "동일시", "마비노기 모바일", "혼합방법"],
+    "links": []
+  },
+  {
+    "id": "jkgs-2026-undertale",
+    "type": "journal",
+    "title": "서사적 윤리구조가 플레이어 존재 양식에 미치는 영향분석",
+    "subtitle": "에리히 프롬 『소유냐 존재냐』를 기반으로",
+    "titleEn": "Influence of Narrative Ethical Structures on Players’ Modes of Being: Based on Erich Fromm’s To Have or To Be",
+    "authors": ["조연재", "이정일", "우탁"],
+    "venue": "한국게임학회 논문지",
+    "volume": "Vol. 26, No. 2, pp. 125–136",
+    "year": 2026,
+    "month": 4,
+    "summary": "도덕적 선택의 자유도가 높은 게임 『언더테일』 플레이어 194명을 설문한 결과, 존재 모드 성향이 높은 플레이어는 불살루트를, 소유 모드 성향이 높은 플레이어는 몰살루트를 선택하는 경향이 나타났다. 디지털게임이 윤리적 성찰의 장이 될 수 있음을 보였다.",
+    "keywords": ["윤리적 존재양식", "언더테일", "플레이어 경험", "도덕적 성찰"],
+    "note": "우수논문포스터발표상 (2026.06)",
+    "links": [
+      { "label": "DBpia", "href": "https://www.dbpia.co.kr/journal/articleDetail?nodeId=NODE12741031" },
+      { "label": "DOI", "href": "https://doi.org/10.7583/JKGS.2026.26.2.125" }
+    ]
+  },
+  {
+    "id": "jdcs-2026-heterotopia",
+    "type": "journal",
+    "title": "메타버스 아바타 경험에 따른 사용자 유형 연구",
+    "subtitle": "헤테로토피아적 정체성 분석",
+    "titleEn": "Study on User Types Based on Avatar Experiences in the Metaverse: An Analysis of Heterotopian Identity",
+    "authors": ["조연재", "우탁"],
+    "venue": "디지털콘텐츠학회논문지",
+    "volume": "Vol. 27, No. 1, pp. 1–11",
+    "year": 2026,
+    "month": 1,
+    "summary": "미셸 푸코의 헤테로토피아 개념을 토대로, 레딧(Reddit) 게시글 3,472개를 K-means 클러스터링으로 분류해 관망형·혼종형·탈피표현형 세 사용자 유형을 도출했다. 메타버스가 헤테로토피아로 기능하려면 아바타를 통한 자기표현과 함께 사회적 상호작용이 필요함을 보였다.",
+    "keywords": ["메타버스", "헤테로토피아", "아바타 경험", "사용자 유형", "정체성"],
+    "links": [
+      { "label": "학회지", "href": "http://journal.dcs.or.kr/_PR/view/?aidx=48239&bidx=4341" },
+      { "label": "DOI", "href": "https://doi.org/10.9728/dcs.2026.27.1.1" }
+    ]
+  }
+]

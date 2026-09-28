@@ -2,6 +2,7 @@ export const SITE = {
   name: '조연재',
   nameEn: 'Cho Yeonjae',
   logo: 'CHOYEONJAE',
+  email: 'skyyeonjae@naver.com',
   tagline: '게임 연구 · 사용자 연구 · 시각 디자인',
 };
 

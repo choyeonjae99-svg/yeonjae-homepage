@@ -25,6 +25,9 @@ body {
   font-size: var(--text-body);
   font-weight: var(--font-weight);
   line-height: var(--leading-body);
+  /* 한글은 단어(어절) 단위로 줄바꿈, 너무 긴 영문·URL 은 넘치지 않게 끊는다 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

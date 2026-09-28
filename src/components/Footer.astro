@@ -16,7 +16,7 @@ const year = new Date().getFullYear();
 ) : (
   <footer class="site-footer page" data-footer>
     <span class="caption">© {year} {SITE.name}</span>
-    <span class="caption">[여기에 이메일 · 외부 프로필 링크]</span>
+    <a class="caption mail" href={`mailto:${SITE.email}`}>{SITE.email}</a>
     <a class="pixel-label top" href="#top">Top</a>
   </footer>
 )}
@@ -47,6 +47,15 @@ const year = new Date().getFullYear();
     align-items: center;
     min-height: var(--tap-min);
     transition: color var(--dur-fast) var(--step-fast);
+  }
+  .mail {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .mail:hover {
+    color: var(--color-accent-light);
   }
   .top:hover {
     color: var(--color-text);
