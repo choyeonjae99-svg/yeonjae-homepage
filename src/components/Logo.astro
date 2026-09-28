@@ -1,0 +1,24 @@
+---
+import { SITE } from '../data/site';
+---
+
+<a class="logo" href="/" aria-label={`${SITE.name} 홈`}>
+  <i aria-hidden="true"></i>{SITE.name}
+</a>
+
+<style>
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--tap-min);
+    font-size: var(--text-name);
+    color: var(--color-text);
+  }
+  .logo i {
+    display: block;
+    width: var(--pixel-logo);
+    height: var(--pixel-logo);
+    background: var(--color-accent);
+  }
+</style>

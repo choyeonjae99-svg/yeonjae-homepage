@@ -1,0 +1,68 @@
+---
+import { SITE } from '../data/site';
+
+interface Props {
+  variant?: 'home' | 'page';
+}
+
+const { variant = 'page' } = Astro.props;
+const year = new Date().getFullYear();
+---
+
+{variant === 'home' ? (
+  <footer class="site-footer home" data-footer>
+    <span class="caption">{SITE.tagline}</span>
+    <span class="pixel-label scroll" aria-hidden="true">Scroll</span>
+  </footer>
+) : (
+  <footer class="site-footer page" data-footer>
+    <span class="caption">© {year} {SITE.name}</span>
+    <span class="caption">[여기에 이메일 · 외부 프로필 링크]</span>
+    <a class="pixel-label top" href="#top">Top</a>
+  </footer>
+)}
+
+<style>
+  .site-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+  }
+  .site-footer.home {
+    position: fixed;
+    left: var(--gutter);
+    right: var(--gutter);
+    bottom: calc(var(--edge-bottom) + env(safe-area-inset-bottom, 0px));
+    z-index: 10;
+  }
+  .site-footer.page {
+    flex-wrap: wrap;
+    margin: var(--space-9) var(--gutter) 0;
+    padding: var(--space-5) 0 var(--edge-bottom);
+    border-top: 1px dashed var(--color-border);
+  }
+  .top {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .top:hover {
+    color: var(--color-text);
+  }
+
+  @media (max-width: 640px) {
+    .site-footer.home .caption {
+      font-size: 12px;
+    }
+    .scroll {
+      display: none;
+    }
+    .site-footer.page {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+    }
+  }
+</style>

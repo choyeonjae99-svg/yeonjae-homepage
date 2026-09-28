@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageIntro from '../../components/PageIntro.astro';
+---
+
+<BaseLayout title="소개">
+  <PageIntro label="About" title="소개" lead="[여기에 한두 줄 자기소개]" />
+  <section class="block">
+    <h2 class="pixel-label">Profile</h2>
+    <p>[여기에 소개글]</p>
+  </section>
+  <section class="block">
+    <h2 class="pixel-label">CV</h2>
+    <p>[여기에 학력 · 경력 · 수상]</p>
+  </section>
+  <section class="block">
+    <h2 class="pixel-label">Papers</h2>
+    <p>[여기에 학위논문 · 학술지 논문 목록]</p>
+  </section>
+</BaseLayout>
+
+<style>
+  .block {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-6) 0;
+    border-top: 1px dashed var(--color-border);
+  }
+</style>

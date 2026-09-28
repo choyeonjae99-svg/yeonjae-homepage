@@ -1,0 +1,83 @@
+---
+/*
+ * 사운드 버튼. 지금은 모양과 켜짐/꺼짐 상태만 있다.
+ * 실제 음원 재생은 4단계에서 연결한다.
+ * transition:persist 로 페이지를 이동해도 같은 요소가 유지된다 (음악이 끊기지 않게).
+ */
+---
+
+<button
+  class="snd"
+  id="sound-toggle"
+  type="button"
+  aria-pressed="false"
+  aria-label="배경음악 켜고 끄기"
+  transition:persist="sound-toggle"
+>
+  <span class="eq" aria-hidden="true">
+    <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+  </span>
+  <span class="label" data-label>SOUND OFF</span>
+</button>
+
+<script>
+  // 이 스크립트는 한 번만 실행되고, 버튼은 persist 되므로 리스너도 유지된다.
+  const btn = document.getElementById('sound-toggle');
+  if (btn && !btn.dataset.ready) {
+    btn.dataset.ready = 'true';
+    btn.addEventListener('click', () => {
+      const on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', String(on));
+      const label = btn.querySelector('[data-label]');
+      if (label) label.textContent = on ? 'SOUND ON' : 'SOUND OFF';
+      document.dispatchEvent(new CustomEvent('sound:toggle', { detail: { on } }));
+    });
+  }
+</script>
+
+<style>
+  .snd {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-1);
+    color: var(--color-text-muted);
+    font-family: var(--font-pixel);
+    font-size: var(--text-label);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .snd:hover,
+  .snd[aria-pressed='true'] {
+    color: var(--color-text);
+  }
+  .eq {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 12px;
+  }
+  .bar {
+    display: block;
+    width: 3px;
+    height: 12px;
+    background: var(--color-accent);
+    transform-origin: bottom;
+    transform: scaleY(0.25);
+  }
+  .snd[aria-pressed='true'] .bar {
+    animation: eq 0.8s var(--step-fast) infinite alternate;
+  }
+  .snd[aria-pressed='true'] .bar:nth-child(2) {
+    animation-delay: 0.25s;
+  }
+  .snd[aria-pressed='true'] .bar:nth-child(3) {
+    animation-delay: 0.5s;
+  }
+  @keyframes eq {
+    from { transform: scaleY(0.25); }
+    to { transform: scaleY(1); }
+  }
+</style>
