@@ -1,0 +1,333 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { Image } from 'astro:assets';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export const getStaticPaths = (async () => {
+  const entries = (await getCollection('portfolio', ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+  );
+  return entries.map((entry) => {
+    // 같은 분류 안에서 이전/다음
+    const same = entries.filter((e) => e.data.category === entry.data.category);
+    const i = same.findIndex((e) => e.id === entry.id);
+    return {
+      params: { slug: entry.id },
+      props: { entry, prev: same[i - 1], next: same[i + 1] },
+    };
+  });
+}) satisfies GetStaticPaths;
+
+interface Props {
+  entry: CollectionEntry<'portfolio'>;
+  prev?: CollectionEntry<'portfolio'>;
+  next?: CollectionEntry<'portfolio'>;
+}
+
+const { entry, prev, next } = Astro.props;
+const d = entry.data;
+const { Content } = await render(entry);
+const CAT = { research: { en: 'Research', ko: '연구 포트폴리오' }, design: { en: 'Design', ko: '디자인 포트폴리오' } };
+const back = d.category === 'research' ? '/portfolio' : '/portfolio#design';
+
+const facts = [
+  { k: '기간', v: d.period },
+  { k: '역할', v: d.role },
+  { k: '게재', v: d.venue },
+  { k: '도구', v: d.tools.join(', ') },
+].filter((f) => f.v);
+---
+
+<BaseLayout title={d.title} description={d.summary}>
+  <article class="project">
+    <a class="back pixel-label" href={back}>
+      <svg width="8" height="8" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="0" y="3" width="8" height="2" /><rect x="2" y="1" width="2" height="2" /><rect x="2" y="5" width="2" height="2" />
+      </svg>
+      {CAT[d.category].ko}
+    </a>
+
+    <header class="head">
+      <p class="pixel-label kind">{CAT[d.category].en} · {d.period}</p>
+      <h1 class="page-title">{d.title}</h1>
+      {d.subtitle && <p class="subtitle">{d.subtitle}</p>}
+      <p class="lead">{d.summary}</p>
+    </header>
+
+    {d.highlights.length > 0 && (
+      <ul class="highlights" aria-label="핵심 수치">
+        {d.highlights.map((h) => (
+          <li>
+            <span class="value">{h.value}</span>
+            <span class="caption">{h.label}</span>
+          </li>
+        ))}
+      </ul>
+    )}
+
+    <div class="layout">
+      <aside class="facts">
+        <dl>
+          {facts.map((f) => (
+            <div>
+              <dt class="pixel-label">{f.k}</dt>
+              <dd>{f.v}</dd>
+            </div>
+          ))}
+        </dl>
+        {d.tags.length > 0 && (
+          <ul class="tags" aria-label="태그">
+            {d.tags.map((t) => <li>{t}</li>)}
+          </ul>
+        )}
+        {d.links.length > 0 && (
+          <p class="links">
+            {d.links.map((l) => (
+              <a class="pixel-label" href={l.href} target="_blank" rel="noopener noreferrer">
+                {l.label}
+                <svg width="8" height="8" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+                  <rect x="2" y="0" width="6" height="2" /><rect x="6" y="0" width="2" height="6" />
+                  <rect x="4" y="2" width="2" height="2" /><rect x="2" y="4" width="2" height="2" />
+                  <rect x="0" y="6" width="2" height="2" />
+                </svg>
+                <span class="visually-hidden">(새 창)</span>
+              </a>
+            ))}
+          </p>
+        )}
+      </aside>
+
+      <div class="prose body">
+        <Content />
+      </div>
+    </div>
+
+    {d.images.length > 0 && (
+      <section class="gallery" aria-labelledby="gallery-title">
+        <h2 class="pixel-label" id="gallery-title">{d.imagesCaption ?? 'Images'}</h2>
+        <ol>
+          {d.images.map((img, i) => (
+            <li>
+              <Image
+                src={img}
+                alt={`${d.title} ${d.imagesCaption ?? '이미지'} ${i + 1}`}
+                widths={[800, 1600]}
+                sizes="(max-width: 1440px) calc(100vw - 96px), 1344px"
+                format="webp"
+              />
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
+
+    {(prev || next) && (
+      <nav class="pager" aria-label="다른 프로젝트">
+        {prev ? (
+          <a href={`/portfolio/${prev.id}`} class="prev">
+            <span class="pixel-label">Newer</span>
+            <span>{prev.data.title}</span>
+          </a>
+        ) : <span />}
+        {next && (
+          <a href={`/portfolio/${next.id}`} class="next">
+            <span class="pixel-label">Older</span>
+            <span>{next.data.title}</span>
+          </a>
+        )}
+      </nav>
+    )}
+  </article>
+</BaseLayout>
+
+<style>
+  .project {
+    display: grid;
+    gap: var(--space-7);
+  }
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    justify-self: start;
+    margin-bottom: calc(var(--space-7) * -1 + var(--space-3));
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .back svg {
+    fill: currentColor;
+  }
+  .back:hover {
+    color: var(--color-text);
+  }
+  .head {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 48em;
+  }
+  .kind {
+    color: var(--color-accent-light);
+  }
+  .page-title {
+    text-wrap: balance;
+  }
+  .subtitle {
+    font-size: 18px;
+    color: var(--color-text-muted);
+  }
+  .lead {
+    margin-top: var(--space-2);
+  }
+
+  .highlights {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: var(--space-4);
+  }
+  .highlights li {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .value {
+    font-family: var(--font-pixel);
+    font-size: 28px;
+    line-height: 1.2;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .highlights li:first-child .value {
+    color: var(--color-accent-light);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--space-7);
+    align-items: start;
+  }
+  .facts {
+    position: sticky;
+    top: var(--space-6);
+    display: grid;
+    gap: var(--space-5);
+  }
+  .facts dl {
+    margin: 0;
+    display: grid;
+    gap: var(--space-4);
+  }
+  .facts dd {
+    margin: 2px 0 0;
+    font-size: var(--text-caption);
+    color: var(--color-text);
+  }
+  .tags {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .tags li {
+    padding: 2px var(--space-2);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    color: var(--color-text);
+  }
+  .links a svg {
+    fill: var(--color-accent);
+  }
+  .links a:hover {
+    color: var(--color-accent-light);
+  }
+  .body {
+    max-width: 52em;
+  }
+
+  .gallery {
+    display: grid;
+    gap: var(--space-4);
+    padding-top: var(--space-7);
+    border-top: 1px dashed var(--color-border);
+  }
+  .gallery ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+  .gallery img {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--color-border);
+  }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+    padding-top: var(--space-6);
+    border-top: 1px dashed var(--color-border);
+  }
+  .pager a {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4) 0;
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .pager a:hover {
+    color: var(--color-text);
+  }
+  .pager .next {
+    text-align: right;
+    grid-column: 2;
+  }
+
+  @media (max-width: 1024px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .facts {
+      position: static;
+    }
+    .facts dl {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    }
+  }
+  @media (max-width: 640px) {
+    .gallery ol {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pager {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pager .next {
+      grid-column: 1;
+      text-align: left;
+    }
+  }
+</style>

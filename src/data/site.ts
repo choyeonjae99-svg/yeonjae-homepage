@@ -17,3 +17,10 @@ export const NAV = [
   { href: '/portfolio', label: '포트폴리오' },
   { href: '/works', label: '그 외 작업물' },
 ] as const;
+
+/** 콘텐츠를 GitHub 에서 바로 추가할 때 쓰는 저장소 정보 (포트폴리오 추가 버튼) */
+export const REPO = {
+  owner: 'choyeonjae99-svg',
+  name: 'yeonjae-homepage',
+  branch: 'main', // 사이트가 배포되는 브랜치
+};

@@ -37,4 +37,37 @@ const papers = defineCollection({
   }),
 });
 
-export const collections = { profile, papers };
+/**
+ * 포트폴리오: src/content/portfolio/{research,design}/[slug].md
+ * 이미지는 같은 이름의 폴더에 둔다 (예: research/[slug]/thumb.png).
+ * 이름이 _ 로 시작하는 파일(_template.md)은 사이트에 나오지 않는다.
+ */
+const portfolio = defineCollection({
+  loader: glob({
+    pattern: ['research/[!_]*.md', 'design/[!_]*.md'],
+    base: './src/content/portfolio',
+    generateId: ({ entry }) => entry.split('/').pop()!.replace(/\.md$/, ''),
+  }),
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      subtitle: z.string().optional(),
+      category: z.enum(['research', 'design']),
+      date: z.coerce.date(), // 정렬 기준 (최신이 앞)
+      period: z.string(), // 카드에 보이는 날짜·기간
+      thumbnail: image().optional(), // 없으면 픽셀 무늬로 대신 표시
+      thumbnailAlt: z.string().default(''),
+      summary: z.string(),
+      tags: z.array(z.string()).default([]),
+      role: z.string().optional(),
+      venue: z.string().optional(),
+      tools: z.array(z.string()).default([]),
+      highlights: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+      links: z.array(z.object({ label: z.string(), href: z.url() })).default([]),
+      images: z.array(image()).default([]),
+      imagesCaption: z.string().optional(),
+      draft: z.boolean().default(false), // true 면 사이트에 안 나온다
+    }),
+});
+
+export const collections = { profile, papers, portfolio };

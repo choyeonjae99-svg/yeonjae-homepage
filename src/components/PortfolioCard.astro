@@ -1,0 +1,139 @@
+---
+/*
+ * 썸네일 카드: 썸네일 + 분류 + 날짜(기간) + 제목 + 한 줄 설명.
+ * 포트폴리오와 그 외 작업물 목록에서 같이 쓴다.
+ */
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  href: string;
+  title: string;
+  subtitle?: string;
+  label: string; // 분류 (영문 픽셀 라벨)
+  period: string;
+  summary?: string;
+  thumbnail?: ImageMetadata;
+  thumbnailAlt?: string;
+}
+
+const { href, title, subtitle, label, period, summary, thumbnail, thumbnailAlt = '' } = Astro.props;
+---
+
+<a class="card" href={href}>
+  <div class="thumb">
+    {thumbnail ? (
+      <Image
+        src={thumbnail}
+        alt={thumbnailAlt}
+        widths={[400, 800, 1200]}
+        sizes="(max-width: 640px) calc(100vw - 48px), (max-width: 1024px) 45vw, 420px"
+        format="webp"
+      />
+    ) : (
+      <span class="placeholder" aria-hidden="true"></span>
+    )}
+  </div>
+  <div class="body">
+    <p class="meta">
+      <span class="pixel-label">{label}</span>
+      <span class="pixel-label date">{period}</span>
+    </p>
+    <h3 class="title">
+      {title}
+      {subtitle && <span class="sub">{subtitle}</span>}
+    </h3>
+    {summary && <p class="caption">{summary}</p>}
+  </div>
+</a>
+
+<style>
+  .card {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    transition: border-color var(--dur-fast) var(--step-fast);
+  }
+  .card:hover,
+  .card:focus-visible {
+    border-color: var(--color-accent);
+  }
+  .card:active {
+    border-color: var(--color-accent-deep);
+  }
+  .thumb {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* 썸네일이 없을 때: 픽셀 격자 무늬 */
+  .placeholder {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--color-dot) 2px, transparent 2.5px);
+    background-size: 16px 16px;
+  }
+  .placeholder::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    background: var(--color-accent);
+  }
+  /* 호버 시 왼쪽 위에 자홍 픽셀 */
+  .thumb::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    width: var(--pixel-logo);
+    height: var(--pixel-logo);
+    background: var(--color-accent);
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--step-fast);
+  }
+  .card:hover .thumb::before {
+    opacity: 1;
+  }
+  .body {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .meta .pixel-label:first-child {
+    color: var(--color-accent-light);
+  }
+  .date {
+    font-variant-numeric: tabular-nums;
+  }
+  .title {
+    display: grid;
+    gap: 2px;
+    font-size: var(--text-body);
+    line-height: 1.5;
+    color: var(--color-text);
+  }
+  .sub {
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+</style>
