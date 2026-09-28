@@ -145,12 +145,14 @@ summary: 카드에 보일 한 줄 설명
 ---
 ```
 
-### 6-1. 포트폴리오 추가하기 (주인용)
+### 6-1. 콘텐츠 추가하기 (주인용 추가 버튼)
 
-- 파일: `src/content/portfolio/{research,design}/[slug].md`. 파일 이름이 주소가 된다(`/portfolio/[slug]`).
+- 파일: `src/content/portfolio/{research,design}/[slug].md` → `/portfolio/[slug]`, `src/content/works/{writing,drawing}/[slug].md` → `/works/[slug]`. `_` 로 시작하는 파일은 사이트에 안 나온다.
 - 이미지는 같은 이름의 폴더나 같은 폴더에 두고 `./파일이름` 으로 적는다. 썸네일이 없으면 픽셀 무늬가 대신 나온다.
-- 템플릿: `src/content/portfolio/design/_template.md` (`_` 로 시작하는 파일은 사이트에 안 나온다).
-- **추가 버튼:** `/portfolio?edit` 로 한 번 들어오면 그 브라우저에서만 디자인 탭에 "디자인 포트폴리오 추가" 카드가 보인다(`?edit=off` 로 끔). 카드의 링크는 GitHub의 이미지 업로드 화면과 템플릿이 채워진 새 파일 화면을 연다. 저장(commit)하면 배포가 다시 돈다. 저장소·브랜치는 `src/data/site.ts` 의 `REPO`.
+- **주인 모드:** 어느 페이지든 주소 뒤에 `?edit` 를 붙여 한 번 들어오면 그 브라우저에서만 `[data-owner-only]` 요소(추가 카드)가 보인다. `?edit=off` 로 끈다. 로직은 `BaseLayout.astro`, 카드는 `OwnerAddCard.astro`, GitHub 링크는 `src/data/github.ts`.
+- **추가 카드 위치:** 포트폴리오 → 디자인 탭 끝 / 그 외 작업물 → 목록 끝(글 쓰기 · 그림 파일 올리기 · 그림 소개 쓰기).
+- 카드의 링크는 GitHub의 이미지 업로드 화면과 템플릿이 채워진 새 파일 화면을 연다. 저장(commit)하면 배포가 다시 돈다. 저장소·브랜치는 `src/data/site.ts` 의 `REPO` (배포 브랜치 `main`).
+- 템플릿: `portfolio/design/_template.md`, `works/writing/_template.md`, `works/drawing/_template.md`. 템플릿을 고치지 않고 저장해도 빌드가 깨지지 않게 이미지 줄은 주석으로 둔다.
 - `period` 는 꼭 따옴표로 감싼다(`'2026.01'`). 안 감싸면 YAML 이 숫자로 읽어 `2026.10` → `2026.1` 이 된다.
 - 연구 포트폴리오 썸네일은 핵심 수치를 픽셀 막대그래프로 새로 그린 것(1200×800), 상세 하단 갤러리는 원본 슬라이드(연락처가 있는 표지·끝장 제외).
 
@@ -179,7 +181,7 @@ summary: 카드에 보일 한 줄 설명
 4. [x] 배경음악 재생 + 음악 반응 모션 — YouTube 플레이어 (`src/scripts/music.ts`)
 5. [x] 소개 페이지 (자기소개 · 이력 · 수상 · 논문) — 내용은 `src/content/about/` (profile.md, cv.json, papers.json), 사진은 `profile.jpg`
 6. [x] 포트폴리오 목록(연구/디자인 탭) + 상세 — `src/pages/portfolio/`, 카드는 `PortfolioCard.astro`
-7. [ ] 그 외 작업물 목록(글/그림 필터) + 상세
+7. [x] 그 외 작업물 목록(글/그림 필터) + 상세 — `src/pages/works/`, 내용은 `src/content/works/{writing,drawing}/`
 8. [ ] 반응형·접근성 점검, 이미지 최적화
 9. [ ] 배포 + 도메인 연결
 
@@ -191,7 +193,7 @@ summary: 카드에 보일 한 줄 설명
 - ~~학위논문 원문 링크~~ → dCollection 반영. 학과명은 **실감융합학과**, 학위논문 제목은 포트폴리오 기준 "유동적 아바타 관계 인식 유형 연구"
 - ~~연구 포트폴리오~~ → 포트폴리오 PDF에서 2개 반영
 - 디자인 포트폴리오 → 주인이 직접 추가 (6-1)
-- 그 외 작업물 (글·그림 게시글별 제목, 날짜, 썸네일, 본문)
+- 그 외 작업물 → 주인이 직접 추가 (6-1)
 - ~~배경음악 MP3 파일~~ → YouTube 링크로 대체 (5장)
 
 ## 11. 참고한 레퍼런스

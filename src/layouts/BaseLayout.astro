@@ -29,6 +29,26 @@ const { title, description, variant = 'page' } = Astro.props;
   </body>
 </html>
 
+<script>
+  // 주인 모드: 어느 페이지든 ?edit 로 한 번 들어오면 이 브라우저에서 [data-owner-only] 가 보인다 (?edit=off 로 끔)
+  const OWNER_KEY = 'yj-owner';
+  function applyOwnerMode() {
+    const params = new URLSearchParams(location.search);
+    try {
+      if (params.has('edit')) {
+        if (params.get('edit') === 'off') localStorage.removeItem(OWNER_KEY);
+        else localStorage.setItem(OWNER_KEY, '1');
+      }
+    } catch {}
+    let owner = import.meta.env.DEV;
+    try {
+      owner ||= localStorage.getItem(OWNER_KEY) === '1';
+    } catch {}
+    document.querySelectorAll<HTMLElement>('[data-owner-only]').forEach((el) => (el.hidden = !owner));
+  }
+  document.addEventListener('astro:page-load', applyOwnerMode);
+</script>
+
 <style>
   .content.page {
     /* 좌우 여백(gutter)을 포함한 폭 → 본문 왼쪽 끝이 로고와 맞는다 */

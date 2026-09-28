@@ -70,4 +70,28 @@ const portfolio = defineCollection({
     }),
 });
 
-export const collections = { profile, papers, portfolio };
+/**
+ * 그 외 작업물: src/content/works/{writing,drawing}/[slug].md
+ * 파일 이름이 주소가 된다 (/works/[slug]). _ 로 시작하는 파일은 사이트에 안 나온다.
+ */
+const works = defineCollection({
+  loader: glob({
+    pattern: ['writing/[!_]*.md', 'drawing/[!_]*.md'],
+    base: './src/content/works',
+    generateId: ({ entry }) => entry.split('/').pop()!.replace(/\.md$/, ''),
+  }),
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      category: z.enum(['writing', 'drawing']),
+      date: z.coerce.date(),
+      thumbnail: image().optional(), // 없으면 픽셀 무늬로 대신 표시
+      thumbnailAlt: z.string().default(''),
+      summary: z.string().default(''),
+      tags: z.array(z.string()).default([]),
+      images: z.array(image()).default([]), // 그림: 상세 페이지에 크게 보여줄 이미지
+      draft: z.boolean().default(false),
+    }),
+});
+
+export const collections = { profile, papers, portfolio, works };

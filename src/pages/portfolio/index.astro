@@ -3,7 +3,8 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageIntro from '../../components/PageIntro.astro';
 import PortfolioCard from '../../components/PortfolioCard.astro';
-import { REPO } from '../../data/site';
+import OwnerAddCard from '../../components/OwnerAddCard.astro';
+import { githubNewFile, githubUpload } from '../../data/github';
 
 const all = (await getCollection('portfolio', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime(),
@@ -14,12 +15,13 @@ const TABS = [
   { id: 'design', label: '디자인 포트폴리오', en: 'Design' },
 ] as const;
 
-// 디자인 포트폴리오 추가: GitHub 에서 템플릿이 채워진 새 파일 화면을 연다
+// 디자인 포트폴리오 추가 (주인 전용): GitHub 에서 템플릿이 채워진 새 파일 화면을 연다
 const dir = 'src/content/portfolio/design';
-const gh = `https://github.com/${REPO.owner}/${REPO.name}`;
 const template = (await import('../../content/portfolio/design/_template.md?raw')).default as string;
-const newFileUrl = `${gh}/new/${REPO.branch}/${dir}?filename=${encodeURIComponent('new-project.md')}&value=${encodeURIComponent(template)}`;
-const uploadUrl = `${gh}/upload/${REPO.branch}/${dir}`;
+const addSteps = [
+  { label: '이미지 올리기', href: githubUpload(dir), note: '썸네일 3:2 (1200×800)' },
+  { label: '내용 쓰기', href: githubNewFile(dir, 'new-project.md', template), note: '템플릿이 채워진 새 글이 열려요' },
+];
 ---
 
 <BaseLayout title="포트폴리오">
@@ -72,25 +74,7 @@ const uploadUrl = `${gh}/upload/${REPO.branch}/${dir}`;
             </li>
           ))}
 
-          {t.id === 'design' && (
-            <li class="add" data-owner-only hidden>
-              <div class="add-card">
-                <span class="plus" aria-hidden="true"></span>
-                <p>디자인 포트폴리오 추가</p>
-                <ol class="caption steps">
-                  <li>
-                    <a href={uploadUrl} target="_blank" rel="noopener noreferrer">이미지 올리기</a>
-                    <span>썸네일 3:2 (1200×800)</span>
-                  </li>
-                  <li>
-                    <a href={newFileUrl} target="_blank" rel="noopener noreferrer">내용 쓰기</a>
-                    <span>템플릿이 채워진 새 글이 열려요</span>
-                  </li>
-                </ol>
-                <p class="hint">저장(Commit)하면 몇 분 뒤 사이트에 나타나요.</p>
-              </div>
-            </li>
-          )}
+          {t.id === 'design' && <OwnerAddCard title="디자인 포트폴리오 추가" steps={addSteps} />}
         </ul>
 
       </section>
@@ -99,8 +83,6 @@ const uploadUrl = `${gh}/upload/${REPO.branch}/${dir}`;
 </BaseLayout>
 
 <script>
-  const OWNER_KEY = 'yj-owner';
-
   function setup() {
     const list = document.querySelector<HTMLElement>('[data-tabs]');
     if (!list) return;
@@ -131,20 +113,6 @@ const uploadUrl = `${gh}/upload/${REPO.branch}/${dir}`;
 
     const hash = location.hash.slice(1);
     if (tabs.some((t) => t.dataset.tab === hash)) select(hash);
-
-    // 주인 모드: /portfolio?edit 로 한 번 들어오면 이 브라우저에서 추가 버튼이 보인다 (?edit=off 로 끔)
-    const params = new URLSearchParams(location.search);
-    try {
-      if (params.has('edit')) {
-        if (params.get('edit') === 'off') localStorage.removeItem(OWNER_KEY);
-        else localStorage.setItem(OWNER_KEY, '1');
-      }
-    } catch {}
-    let owner = import.meta.env.DEV;
-    try {
-      owner ||= localStorage.getItem(OWNER_KEY) === '1';
-    } catch {}
-    document.querySelectorAll<HTMLElement>('[data-owner-only]').forEach((el) => (el.hidden = !owner));
   }
 
   document.addEventListener('astro:page-load', setup);
@@ -199,72 +167,7 @@ const uploadUrl = `${gh}/upload/${REPO.branch}/${dir}`;
   .grid > li {
     min-width: 0;
   }
-  .grid > li[hidden] {
-    display: none;
-  }
   .empty {
     padding-bottom: var(--space-5);
-  }
-
-  /* 추가 카드 (주인에게만 보임) */
-  .add-card {
-    display: grid;
-    align-content: center;
-    justify-items: start;
-    gap: var(--space-3);
-    height: 100%;
-    min-height: 280px;
-    padding: var(--space-5);
-    border: 2px dashed var(--color-dot);
-  }
-  .plus {
-    position: relative;
-    width: 16px;
-    height: 16px;
-  }
-  .plus::before,
-  .plus::after {
-    content: '';
-    position: absolute;
-    background: var(--color-accent);
-  }
-  .plus::before {
-    left: 6px;
-    top: 0;
-    width: 4px;
-    height: 16px;
-  }
-  .plus::after {
-    left: 0;
-    top: 6px;
-    width: 16px;
-    height: 4px;
-  }
-  .steps {
-    margin: 0;
-    padding-left: 1.2em;
-    display: grid;
-    gap: var(--space-1);
-  }
-  .steps li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0 var(--space-3);
-  }
-  .steps a {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--tap-min);
-    color: var(--color-accent-light);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .steps a:hover {
-    color: var(--color-text);
-  }
-  .hint {
-    font-size: 12px;
-    color: var(--color-text-muted);
   }
 </style>

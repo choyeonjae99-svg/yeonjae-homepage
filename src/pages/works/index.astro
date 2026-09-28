@@ -1,9 +1,147 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageIntro from '../../components/PageIntro.astro';
+import PortfolioCard from '../../components/PortfolioCard.astro';
+import OwnerAddCard from '../../components/OwnerAddCard.astro';
+import { githubNewFile, githubUpload } from '../../data/github';
+import { formatDate } from '../../data/format';
+
+const all = (await getCollection('works', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+
+const FILTERS = [
+  { id: 'all', label: '전체' },
+  { id: 'writing', label: '글' },
+  { id: 'drawing', label: '그림' },
+] as const;
+const LABEL = { writing: 'Writing', drawing: 'Drawing' } as const;
+const count = (id: string) => (id === 'all' ? all.length : all.filter((e) => e.data.category === id).length);
+
+// 주인 전용 추가 카드: 글 쓰기 / 그림 올리기 + 그림 글 쓰기
+const writingTpl = (await import('../../content/works/writing/_template.md?raw')).default as string;
+const drawingTpl = (await import('../../content/works/drawing/_template.md?raw')).default as string;
+const addSteps = [
+  { label: '글 쓰기', href: githubNewFile('src/content/works/writing', 'new-writing.md', writingTpl), note: '템플릿이 채워진 새 글' },
+  { label: '그림 파일 올리기', href: githubUpload('src/content/works/drawing'), note: '가로 1600–2000px' },
+  { label: '그림 소개 쓰기', href: githubNewFile('src/content/works/drawing', 'new-drawing.md', drawingTpl), note: '올린 파일 이름을 적어요' },
+];
 ---
 
 <BaseLayout title="그 외 작업물">
-  <PageIntro label="Works" title="그 외 작업물" lead="[여기에 작업물 한 줄 설명]" />
-  <p class="caption">[7단계: 글 / 그림 필터 + 썸네일 카드 그리드]</p>
+  <PageIntro label="Works" title="그 외 작업물" lead="연구와 디자인 바깥에서 쓰고 그린 것들입니다." />
+
+  <div class="filters" role="group" aria-label="작업물 분류" data-filters>
+    {FILTERS.map((f, i) => (
+      <button type="button" aria-pressed={i === 0 ? 'true' : 'false'} data-filter={f.id}>
+        {f.label}
+        <span class="count pixel-label">{count(f.id)}</span>
+      </button>
+    ))}
+  </div>
+
+  <p class="empty caption" data-empty hidden={all.length > 0}>아직 올린 작업물이 없습니다.</p>
+
+  <ul class="grid" aria-live="polite">
+    {all.map(({ id, data }) => (
+      <li data-cat={data.category}>
+        <PortfolioCard
+          href={`/works/${id}`}
+          title={data.title}
+          label={LABEL[data.category]}
+          period={formatDate(data.date)}
+          summary={data.summary}
+          thumbnail={data.thumbnail}
+          thumbnailAlt={data.thumbnailAlt}
+        />
+      </li>
+    ))}
+    <OwnerAddCard title="작업물 추가" steps={addSteps} />
+  </ul>
 </BaseLayout>
+
+<script>
+  function setup() {
+    const group = document.querySelector<HTMLElement>('[data-filters]');
+    if (!group) return;
+    const buttons = [...group.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const items = [...document.querySelectorAll<HTMLElement>('.grid > li[data-cat]')];
+    const empty = document.querySelector<HTMLElement>('[data-empty]');
+
+    const apply = (id: string) => {
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === id)));
+      let shown = 0;
+      items.forEach((li) => {
+        const on = id === 'all' || li.dataset.cat === id;
+        li.hidden = !on;
+        if (on) shown++;
+      });
+      if (empty) empty.hidden = shown > 0;
+      history.replaceState(history.state, '', id === 'all' ? location.pathname + location.search : `#${id}`);
+    };
+
+    buttons.forEach((b) => b.addEventListener('click', () => apply(b.dataset.filter!)));
+    const hash = location.hash.slice(1);
+    if (buttons.some((b) => b.dataset.filter === hash)) apply(hash);
+  }
+
+  document.addEventListener('astro:page-load', setup);
+</script>
+
+<style>
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+  }
+  .filters button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-menu);
+    color: var(--color-text-muted);
+    transition:
+      color var(--dur-fast) var(--step-fast),
+      border-color var(--dur-fast) var(--step-fast);
+  }
+  .filters button:hover {
+    color: var(--color-text);
+    border-color: var(--color-dot);
+  }
+  .filters button[aria-pressed='true'] {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+  }
+  .filters button:active {
+    border-color: var(--color-accent-deep);
+  }
+  .count {
+    color: var(--color-dot);
+  }
+  [aria-pressed='true'] .count {
+    color: var(--color-accent-light);
+  }
+
+  .empty {
+    padding-bottom: var(--space-5);
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+    gap: var(--space-5);
+  }
+  .grid > li {
+    min-width: 0;
+  }
+  .grid > li[hidden] {
+    display: none;
+  }
+</style>
