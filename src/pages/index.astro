@@ -1,18 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import SynapseCanvas from '../components/SynapseCanvas.astro';
 import { SITE } from '../data/site';
 ---
 
 <BaseLayout variant="home">
   <h1 class="visually-hidden">{SITE.name} — {SITE.tagline}</h1>
-  <!-- 3단계에서 시냅스 연결망 Canvas가 여기에 들어간다 -->
-  <div class="stage" data-stage aria-hidden="true"></div>
+  <SynapseCanvas />
 </BaseLayout>
-
-<style>
-  .stage {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-  }
-</style>

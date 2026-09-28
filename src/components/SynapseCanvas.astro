@@ -1,0 +1,49 @@
+---
+/*
+ * 메인 화면 시냅스 연결망. 그리는 로직은 src/scripts/synapse.ts
+ */
+---
+
+<div class="stage" data-stage aria-hidden="true">
+  <canvas data-synapse></canvas>
+</div>
+
+<script>
+  import { Synapse } from '../scripts/synapse';
+
+  let synapse: Synapse | null = null;
+
+  function mount() {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-synapse]');
+    if (!canvas || synapse) return;
+    try {
+      synapse = new Synapse(canvas);
+      // 4단계에서 음악 반응을 붙일 수 있게 열어둔다
+      (window as unknown as { synapse?: Synapse }).synapse = synapse;
+    } catch {
+      // Canvas를 못 쓰는 환경이면 도트 격자 배경만 남긴다
+    }
+  }
+
+  function unmount() {
+    synapse?.destroy();
+    synapse = null;
+    delete (window as unknown as { synapse?: Synapse }).synapse;
+  }
+
+  document.addEventListener('astro:page-load', mount);
+  document.addEventListener('astro:before-swap', unmount);
+</script>
+
+<style>
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+</style>
