@@ -3,22 +3,28 @@ import { SITE } from '../data/site';
 ---
 
 <a class="logo" href="/" aria-label={`${SITE.name} 홈`}>
-  <i aria-hidden="true"></i>{SITE.name}
+  <i aria-hidden="true"></i><span lang="en">{SITE.logo}</span>
 </a>
 
 <style>
   .logo {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-height: var(--tap-min);
-    font-size: var(--text-name);
+    font-family: var(--font-logo);
+    font-size: var(--text-logo);
+    font-weight: var(--font-weight-logo);
+    font-style: italic;
+    letter-spacing: 0.04em;
+    line-height: 1;
     color: var(--color-text);
   }
   .logo i {
     display: block;
-    width: var(--pixel-logo);
-    height: var(--pixel-logo);
+    flex: none;
+    width: var(--pixel-logo-mark);
+    height: var(--pixel-logo-mark);
     background: var(--color-accent);
   }
 </style>

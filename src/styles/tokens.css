@@ -19,12 +19,14 @@
   /* ── 폰트 ─────────────────────────────── */
   --font-sans: 'IBM Plex Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --font-pixel: 'Silkscreen', ui-monospace, monospace;
-  --font-weight: 400; /* 굵기는 400 하나만 */
+  --font-logo: 'Playfair Display', 'Bodoni Moda', Georgia, 'Times New Roman', serif; /* 로고 전용 */
+  --font-weight: 400; /* 굵기는 400 하나만 (로고만 예외) */
+  --font-weight-logo: 600;
 
   /* 글자 크기 */
   --text-title: 32px;   /* 하위 페이지 제목 (모바일 26px) */
   --text-body: 16px;    /* 본문 15–16px */
-  --text-name: 15px;    /* 로고 옆 이름 */
+  --text-logo: 24px;    /* 로고 CHOYEONJAE (모바일 20px) */
   --text-menu: 14px;    /* 메뉴 */
   --text-caption: 13px; /* 캡션 */
   --text-label: 11px;   /* 픽셀 라벨 (Silkscreen) */
@@ -53,7 +55,8 @@
   --header-h: 44px;
 
   /* ── 도트 픽셀 스타일 ─────────────────── */
-  --pixel-logo: 8px;       /* 로고 자홍 네모 */
+  --pixel-logo: 8px;       /* 작은 자홍 네모 (모바일 메뉴 등) */
+  --pixel-logo-mark: 12px; /* 로고 자홍 네모 (모바일 10px) */
   --pixel-node: 6px;       /* 회색 노드 */
   --pixel-node-accent: 10px;
   --dash-width: 2px;       /* 픽셀 점선: 2px 선 + 6px 간격 */
@@ -77,6 +80,8 @@
   :root {
     --text-title: 26px;
     --text-body: 15px;
+    --text-logo: 20px;
+    --pixel-logo-mark: 10px;
     --gutter: 24px;
     --edge-top: 20px;
     --edge-bottom: 24px;

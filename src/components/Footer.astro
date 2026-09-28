@@ -11,7 +11,6 @@ const year = new Date().getFullYear();
 
 {variant === 'home' ? (
   <footer class="site-footer home" data-footer>
-    <span class="caption">{SITE.tagline}</span>
     <span class="pixel-label scroll" aria-hidden="true">Scroll</span>
   </footer>
 ) : (
@@ -30,6 +29,7 @@ const year = new Date().getFullYear();
     gap: var(--space-5);
   }
   .site-footer.home {
+    justify-content: flex-end;
     position: fixed;
     left: var(--gutter);
     right: var(--gutter);
@@ -53,9 +53,6 @@ const year = new Date().getFullYear();
   }
 
   @media (max-width: 640px) {
-    .site-footer.home .caption {
-      font-size: 12px;
-    }
     .scroll {
       display: none;
     }

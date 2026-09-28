@@ -8,7 +8,7 @@
  *  - 커서 근처 노드가 끌려오고, 커서와 가까운 노드 사이에 임시 연결선이 생긴다.
  *  - 화면 크기에 따라 노드 수·배치를 새로 만든다. 모바일은 노드 수가 적다.
  *  - prefers-reduced-motion 이면 정지 화면 한 장만 그린다.
- *  - setLevel(0–1) 로 음악 볼륨을 넣으면 신호 속도와 맥박이 반응한다 (4단계).
+ *  - setLevel(0–1) / setLevelSource() 로 음악 반응 값을 넣으면 신호 속도와 맥박이 반응한다.
  */
 
 type Node = {
@@ -104,10 +104,16 @@ export class Synapse {
     this.start();
   }
 
-  /** 음악 볼륨 (0–1). 4단계에서 AnalyserNode 값을 넣는다. */
+  /** 음악 반응 정도 (0–1) */
   setLevel(v: number) {
     this.level = Math.max(0, Math.min(1, v));
   }
+
+  /** 매 틱마다 음악 반응 값을 읽어올 함수 */
+  setLevelSource(fn: (() => number) | null) {
+    this.levelSource = fn;
+  }
+  private levelSource: (() => number) | null = null;
 
   destroy() {
     this.stop();
@@ -312,6 +318,7 @@ export class Synapse {
 
   private update(dt: number) {
     this.time += dt;
+    if (this.levelSource) this.setLevel(this.levelSource());
 
     // 커서 쪽으로 끌려가기 (정지 상태 기준 거리로 계산)
     const p = this.pointer;

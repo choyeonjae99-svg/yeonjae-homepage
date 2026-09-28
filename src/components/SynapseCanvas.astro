@@ -10,6 +10,7 @@
 
 <script>
   import { Synapse } from '../scripts/synapse';
+  import { music } from '../scripts/music';
 
   let synapse: Synapse | null = null;
 
@@ -18,7 +19,7 @@
     if (!canvas || synapse) return;
     try {
       synapse = new Synapse(canvas);
-      // 4단계에서 음악 반응을 붙일 수 있게 열어둔다
+      synapse.setLevelSource(() => music.level());
       (window as unknown as { synapse?: Synapse }).synapse = synapse;
     } catch {
       // Canvas를 못 쓰는 환경이면 도트 격자 배경만 남긴다
