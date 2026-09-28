@@ -61,6 +61,9 @@ const { title, description, variant = 'page' } = Astro.props;
   }
 
   .skip-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
     position: absolute;
     left: var(--gutter);
     top: var(--space-2);

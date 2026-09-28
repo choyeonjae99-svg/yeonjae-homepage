@@ -80,8 +80,11 @@
     color: var(--color-text);
   }
   .snd[data-state='error'] {
-    color: var(--color-dot);
+    color: var(--color-text-muted);
     cursor: default;
+  }
+  .snd[data-state='error'] .bar {
+    background: var(--color-dot);
   }
   /* 불러오는 중: 바가 차례로 깜빡인다 */
   .snd[data-state='loading'] .bar {
