@@ -1,0 +1,990 @@
+---
+/*
+ * 관리자 페이지 (주인 전용). 서버에서 실행되고 검색엔진에 올리지 않는다.
+ * - 올리기: 포트폴리오(연구·디자인) / 그 외 작업물(글·그림) 을 GitHub 에 커밋 → 자동 재배포
+ * - 방명록: 비공개 글·연락처 보기, 답장, 공개 전환, 삭제
+ * - 박자 맞추기: 음악을 들으며 탭해서 BPM·첫 박 위치를 정해 저장
+ * - 올린 글: 지우기
+ */
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { adminConfigured, isAdmin } from '../lib/server/session';
+import { githubConfigured } from '../lib/server/github';
+import { getStore } from '../lib/server/store';
+import { KINDS } from '../lib/server/content';
+import { MUSIC } from '../data/site';
+
+export const prerender = false;
+Astro.response.headers.set('cache-control', 'no-store');
+
+const configured = adminConfigured();
+const loggedIn = configured && isAdmin(Astro.cookies);
+const hasGithub = githubConfigured();
+const hasStore = Boolean(getStore());
+const kindParam = Astro.url.searchParams.get('kind');
+const initialKind = kindParam && kindParam in KINDS ? kindParam : 'design';
+const today = new Date().toISOString().slice(0, 10);
+
+const posts = loggedIn
+  ? [
+      ...(await getCollection('portfolio')).map((e) => ({ kind: e.data.category, slug: e.id, title: e.data.title, date: e.data.date, base: '/portfolio' })),
+      ...(await getCollection('works')).map((e) => ({ kind: e.data.category, slug: e.id, title: e.data.title, date: e.data.date, base: '/works' })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime())
+  : [];
+const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
+---
+
+<BaseLayout title="관리자" noindex>
+  <div class="admin-root">
+  <div class="head">
+    <p class="pixel-label">Admin</p>
+    <h1 class="page-title">관리자</h1>
+  </div>
+
+  {!configured && (
+    <section class="panel-box">
+      <h2 class="h">아직 관리자 설정이 안 됐어요</h2>
+      <p class="caption">
+        Vercel 프로젝트 → Settings → Environment Variables 에 <code>ADMIN_PASSWORD</code>(로그인 비밀번호)와
+        <code>SESSION_SECRET</code>(16자 이상 아무 문자열)을 넣고 다시 배포해 주세요.
+      </p>
+    </section>
+  )}
+
+  {configured && !loggedIn && (
+    <form class="panel-box login" data-login>
+      <label for="admin-pw">비밀번호</label>
+      <input id="admin-pw" name="password" type="password" autocomplete="current-password" required />
+      <button type="submit" class="btn primary">로그인</button>
+      <p class="status" role="status" aria-live="polite" data-login-status></p>
+    </form>
+  )}
+
+  {loggedIn && (
+    <>
+      <div class="bar">
+        <div class="tabs" role="tablist" aria-label="관리 메뉴" data-admin-tabs>
+          <button type="button" role="tab" id="t-upload" aria-controls="p-upload" aria-selected="true" data-tab="upload">올리기</button>
+          <button type="button" role="tab" id="t-guestbook" aria-controls="p-guestbook" aria-selected="false" tabindex="-1" data-tab="guestbook">방명록</button>
+          <button type="button" role="tab" id="t-beat" aria-controls="p-beat" aria-selected="false" tabindex="-1" data-tab="beat">박자 맞추기</button>
+          <button type="button" role="tab" id="t-posts" aria-controls="p-posts" aria-selected="false" tabindex="-1" data-tab="posts">올린 글</button>
+        </div>
+        <button type="button" class="btn ghost" data-logout>로그아웃</button>
+      </div>
+
+      {(!hasGithub || !hasStore) && (
+        <p class="warn">
+          {!hasGithub && <span>올리기·박자 저장에는 <code>GITHUB_TOKEN</code> 이 필요해요. </span>}
+          {!hasStore && <span>방명록에는 Upstash Redis 연결이 필요해요.</span>}
+        </p>
+      )}
+
+      <!-- 올리기 -->
+      <section role="tabpanel" id="p-upload" aria-labelledby="t-upload" data-panel="upload">
+        <form class="upload" data-upload novalidate>
+          <fieldset class="kinds">
+            <legend class="pixel-label">Type</legend>
+            {Object.entries(KINDS).map(([k, v]) => (
+              <label class="kind">
+                <input type="radio" name="kind" value={k} checked={k === initialKind} />
+                <span>{v.label}</span>
+              </label>
+            ))}
+          </fieldset>
+
+          <div class="grid2">
+            <div class="field span2">
+              <label for="u-title">제목 *</label>
+              <input id="u-title" name="title" type="text" maxlength="120" required />
+            </div>
+            <div class="field span2" data-for="portfolio">
+              <label for="u-subtitle">부제</label>
+              <input id="u-subtitle" name="subtitle" type="text" maxlength="120" />
+            </div>
+            <div class="field">
+              <label for="u-date">날짜 *</label>
+              <input id="u-date" name="date" type="date" value={today} required />
+              <p class="hint">목록 정렬 기준 (최신이 앞)</p>
+            </div>
+            <div class="field" data-for="portfolio">
+              <label for="u-period">기간 표시</label>
+              <input id="u-period" name="period" type="text" maxlength="40" placeholder="예: 2025.03 – 2025.06" />
+              <p class="hint">비우면 날짜의 연.월</p>
+            </div>
+            <div class="field span2">
+              <label for="u-summary">한 줄 설명</label>
+              <input id="u-summary" name="summary" type="text" maxlength="200" placeholder="카드에 보이는 문장" />
+            </div>
+            <div class="field">
+              <label for="u-tags">태그</label>
+              <input id="u-tags" name="tags" type="text" placeholder="쉼표로 구분: 포스터, 타이포" />
+            </div>
+            <div class="field">
+              <label for="u-slug">주소 이름 (영문)</label>
+              <input id="u-slug" name="slug" type="text" maxlength="60" pattern="[a-z0-9-]*" placeholder="예: poster-series" />
+              <p class="hint">비우면 날짜로 자동: 주소가 /…/이름 이 돼요</p>
+            </div>
+            <div class="field" data-for="portfolio">
+              <label for="u-role">역할</label>
+              <input id="u-role" name="role" type="text" maxlength="80" placeholder="예: 기획·디자인" />
+            </div>
+            <div class="field" data-for="portfolio">
+              <label for="u-tools">도구</label>
+              <input id="u-tools" name="tools" type="text" placeholder="쉼표로 구분: Figma, Illustrator" />
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="u-thumb">썸네일 이미지</label>
+              <input id="u-thumb" name="thumb" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+              <p class="hint">3:2 비율 권장. 자동으로 줄여서 올려요</p>
+            </div>
+            <div class="field">
+              <label for="u-alt">썸네일 설명</label>
+              <input id="u-alt" name="thumbnailAlt" type="text" maxlength="200" placeholder="화면 낭독기용 한 문장" />
+            </div>
+            <div class="field span2">
+              <label for="u-images">상세 이미지 (여러 장)</label>
+              <input id="u-images" name="images" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+              <p class="hint">고른 순서대로 상세 페이지에 크게 보여요</p>
+              <ul class="previews" data-previews></ul>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="u-body">본문</label>
+            <textarea id="u-body" name="body" rows="12" placeholder={'## 소제목\n\n본문을 쓰세요. **강조**, - 목록, > 인용, [링크](https://...) 를 쓸 수 있어요.'}></textarea>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn primary" disabled={!hasGithub}>올리기</button>
+            <p class="status" role="status" aria-live="polite" data-upload-status></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- 방명록 -->
+      <section role="tabpanel" id="p-guestbook" aria-labelledby="t-guestbook" data-panel="guestbook" hidden>
+        <p class="caption" data-gb-info>불러오는 중…</p>
+        <ol class="gb" data-gb-admin></ol>
+      </section>
+
+      <!-- 박자 맞추기 -->
+      <section role="tabpanel" id="p-beat" aria-labelledby="t-beat" data-panel="beat" hidden>
+        <div class="beat">
+          <ol class="steps caption">
+            <li>오른쪽 위 <strong>SOUND</strong> 를 눌러 음악을 켜요.</li>
+            <li>마디의 첫 박(가장 센 박)부터 박자에 맞춰 <strong>탭</strong> 버튼을 누르거나 <kbd>Space</kbd> 를 8번 이상 눌러요.</li>
+            <li>아래 네모가 음악과 같이 깜빡이면 <strong>저장</strong>. 어긋나면 −/+ 로 조금씩 옮겨요.</li>
+          </ol>
+
+          <div class="tap-row">
+            <button type="button" class="tap" data-tap>탭</button>
+            <div class="metro" aria-hidden="true">
+              <span data-metro></span><span data-metro></span><span data-metro></span><span data-metro></span>
+            </div>
+          </div>
+          <p class="caption" data-tap-info>탭 0번</p>
+
+          <div class="grid3">
+            <div class="field">
+              <label for="b-bpm">BPM</label>
+              <input id="b-bpm" type="number" min="40" max="240" step="0.01" value={MUSIC.bpm} />
+            </div>
+            <div class="field">
+              <label for="b-offset">첫 박 위치 (초)</label>
+              <div class="nudge">
+                <button type="button" class="btn ghost" data-nudge="-0.02" aria-label="첫 박 0.02초 앞으로">−</button>
+                <input id="b-offset" type="number" min="0" max="59" step="0.001" value={MUSIC.offset} />
+                <button type="button" class="btn ghost" data-nudge="0.02" aria-label="첫 박 0.02초 뒤로">+</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="b-bar">한 마디 박 수</label>
+              <select id="b-bar">
+                {[2, 3, 4, 6].map((n) => <option value={n} selected={n === MUSIC.beatsPerBar}>{n}</option>)}
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn ghost" data-tap-reset>탭 다시 하기</button>
+            <button type="button" class="btn primary" data-beat-save disabled={!hasGithub}>저장</button>
+            <p class="status" role="status" aria-live="polite" data-beat-status></p>
+          </div>
+          <p class="hint">지금 저장된 값: {MUSIC.bpm} BPM · 첫 박 {MUSIC.offset}초 · {MUSIC.beatsPerBar}박자</p>
+        </div>
+      </section>
+
+      <!-- 올린 글 -->
+      <section role="tabpanel" id="p-posts" aria-labelledby="t-posts" data-panel="posts" hidden>
+        <ul class="posts">
+          {posts.map((p) => (
+            <li>
+              <span class="pixel-label kind-l">{KINDS[p.kind as keyof typeof KINDS].label}</span>
+              <a href={`${p.base}/${p.slug}`}>{p.title}</a>
+              <span class="caption">{fmt(p.date)}</span>
+              <button type="button" class="btn ghost danger" data-del-kind={p.kind} data-del-slug={p.slug} data-del-title={p.title} disabled={!hasGithub}>지우기</button>
+            </li>
+          ))}
+        </ul>
+        <p class="status" role="status" aria-live="polite" data-posts-status></p>
+      </section>
+    </>
+  )}
+  </div>
+</BaseLayout>
+
+<script>
+  import { music } from '../scripts/music';
+
+  const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = document) => root.querySelector<T>(s);
+  const api = async (url: string, init: RequestInit = {}) => {
+    const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `요청이 실패했어요 (${res.status})`);
+    return data;
+  };
+
+  // ── 이미지: 브라우저에서 줄이고 WebP(안 되면 JPEG)로 바꿔 base64 로 ──
+  const toBase64 = (blob: Blob) =>
+    new Promise<string>((ok, no) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result).split(',')[1]);
+      r.onerror = () => no(r.error);
+      r.readAsDataURL(blob);
+    });
+  async function shrink(file: File, maxW: number): Promise<string> {
+    if (file.type === 'image/gif') return toBase64(file); // 움직이는 GIF 는 그대로
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+    const scale = Math.min(1, maxW / bmp.width);
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+    const enc = (type: string, q: number) => new Promise<Blob | null>((ok) => c.toBlob(ok, type, q));
+    let blob = await enc('image/webp', 0.86);
+    if (!blob || blob.type !== 'image/webp') blob = await enc('image/jpeg', 0.88);
+    return toBase64(blob!);
+  }
+
+  function setupLogin() {
+    const form = $<HTMLFormElement>('[data-login]');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const status = $('[data-login-status]')!;
+      status.textContent = '확인 중…';
+      try {
+        await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ password: new FormData(form).get('password') }) });
+        location.reload();
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      }
+    });
+  }
+
+  function setupTabs() {
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-admin-tabs] [role="tab"]')];
+    if (!tabs.length) return;
+    const select = (id: string, focus = false) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.tab === id;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+      });
+      document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => (p.hidden = p.dataset.panel !== id));
+      document.dispatchEvent(new CustomEvent('admin:tab', { detail: id }));
+      history.replaceState(history.state, '', `${location.pathname}${location.search}#${id}`);
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(t.dataset.tab!));
+      t.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        const n = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        select(tabs[n].dataset.tab!, true);
+      });
+    });
+    const hash = location.hash.slice(1);
+    if (tabs.some((t) => t.dataset.tab === hash)) select(hash);
+    $('[data-logout]')?.addEventListener('click', async () => {
+      await api('/api/admin/login', { method: 'DELETE' }).catch(() => {});
+      location.href = '/';
+    });
+  }
+
+  function setupUpload() {
+    const form = $<HTMLFormElement>('[data-upload]');
+    if (!form) return;
+    const status = $('[data-upload-status]')!;
+    const syncKind = () => {
+      const kind = (form.elements.namedItem('kind') as RadioNodeList).value;
+      const portfolio = kind === 'research' || kind === 'design';
+      form.querySelectorAll<HTMLElement>('[data-for="portfolio"]').forEach((el) => (el.hidden = !portfolio));
+    };
+    form.addEventListener('change', (e) => {
+      if ((e.target as HTMLInputElement).name === 'kind') syncKind();
+    });
+    syncKind();
+
+    const imagesInput = $<HTMLInputElement>('#u-images', form)!;
+    imagesInput.addEventListener('change', () => {
+      const ul = $('[data-previews]', form)!;
+      ul.replaceChildren(
+        ...[...(imagesInput.files ?? [])].map((f, i) => {
+          const li = document.createElement('li');
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(f);
+          img.alt = `${i + 1}번째 이미지 미리보기`;
+          li.append(img);
+          return li;
+        }),
+      );
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const title = String(fd.get('title') ?? '').trim();
+      if (!title) return void ((status.textContent = '제목을 적어 주세요.'), $<HTMLInputElement>('#u-title', form)!.focus());
+      const slug = String(fd.get('slug') ?? '').trim();
+      if (slug && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return void (status.textContent = '주소 이름은 영문 소문자·숫자·하이픈만 쓸 수 있어요.');
+
+      const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      btn.disabled = true;
+      try {
+        const upload = async (file: File, maxW: number) =>
+          api('/api/admin/blob', { method: 'POST', body: JSON.stringify({ data: await shrink(file, maxW) }) }) as Promise<{ sha: string; ext: string }>;
+
+        const thumbFile = (fd.get('thumb') as File | null) ?? null;
+        let thumbnail: { sha: string; ext: string } | undefined;
+        if (thumbFile && thumbFile.size) {
+          status.textContent = '썸네일 올리는 중…';
+          thumbnail = await upload(thumbFile, 1600);
+        }
+        const files = [...(imagesInput.files ?? [])];
+        const images: { sha: string; ext: string }[] = [];
+        for (const [i, f] of files.entries()) {
+          status.textContent = `이미지 올리는 중… (${i + 1}/${files.length})`;
+          images.push(await upload(f, 2000));
+        }
+        status.textContent = '글 저장하는 중…';
+        const res = await api('/api/admin/posts', {
+          method: 'POST',
+          body: JSON.stringify({
+            kind: fd.get('kind'),
+            title,
+            subtitle: fd.get('subtitle'),
+            date: fd.get('date'),
+            period: fd.get('period'),
+            summary: fd.get('summary'),
+            tags: fd.get('tags'),
+            slug,
+            role: fd.get('role'),
+            tools: fd.get('tools'),
+            thumbnailAlt: fd.get('thumbnailAlt'),
+            body: fd.get('body'),
+            thumbnail,
+            images,
+          }),
+        });
+        form.reset();
+        $('[data-previews]', form)!.replaceChildren();
+        syncKind();
+        status.replaceChildren(
+          '올렸어요! 1–2분 뒤 사이트에 나타나요 → ',
+          Object.assign(document.createElement('a'), { href: res.url, textContent: res.url }),
+        );
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  function setupGuestbook() {
+    const list = $('[data-gb-admin]');
+    if (!list) return;
+    const info = $('[data-gb-info]')!;
+    type Entry = { id: string; name: string; contact: string; message: string; isPublic: boolean; createdAt: number; reply?: string };
+    const fmt = (t: number) => new Date(t).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+
+    const row = (e: Entry) => {
+      const li = document.createElement('li');
+      li.className = 'gb-item';
+      const head = document.createElement('p');
+      head.className = 'gb-head';
+      const who = document.createElement('span');
+      who.className = 'gb-who';
+      who.textContent = e.name;
+      const badge = document.createElement('span');
+      badge.className = `badge ${e.isPublic ? 'pub' : ''}`;
+      badge.textContent = e.isPublic ? '공개' : '비공개';
+      const time = document.createElement('span');
+      time.className = 'caption';
+      time.textContent = fmt(e.createdAt);
+      head.append(who, badge, time);
+      const contact = document.createElement('p');
+      contact.className = 'caption';
+      contact.textContent = e.contact ? `연락처: ${e.contact}` : '연락처 없음';
+      const msg = document.createElement('p');
+      msg.className = 'gb-msg';
+      msg.textContent = e.message;
+
+      const replyId = `r-${e.id}`;
+      const label = Object.assign(document.createElement('label'), { htmlFor: replyId, textContent: '답장 (공개 글이면 방문자에게도 보여요)' });
+      const ta = Object.assign(document.createElement('textarea'), { id: replyId, rows: 2, maxLength: 1000, value: e.reply ?? '' });
+      const acts = document.createElement('div');
+      acts.className = 'actions';
+      const mk = (text: string, cls: string, fn: () => Promise<void>) => {
+        const b = Object.assign(document.createElement('button'), { type: 'button', textContent: text, className: `btn ${cls}` });
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          try {
+            await fn();
+          } catch (err) {
+            info.textContent = (err as Error).message;
+          } finally {
+            b.disabled = false;
+          }
+        });
+        return b;
+      };
+      acts.append(
+        mk('답장 저장', 'ghost', async () => {
+          await api('/api/guestbook', { method: 'PATCH', body: JSON.stringify({ id: e.id, reply: ta.value }) });
+          info.textContent = '답장을 저장했어요.';
+        }),
+        mk(e.isPublic ? '비공개로' : '공개로', 'ghost', async () => {
+          await api('/api/guestbook', { method: 'PATCH', body: JSON.stringify({ id: e.id, isPublic: !e.isPublic }) });
+          await load();
+        }),
+        mk('지우기', 'ghost danger', async () => {
+          if (!confirm(`${e.name} 님의 글을 지울까요? 되돌릴 수 없어요.`)) return;
+          await api(`/api/guestbook?id=${encodeURIComponent(e.id)}`, { method: 'DELETE' });
+          await load();
+        }),
+      );
+      li.append(head, contact, msg, label, ta, acts);
+      return li;
+    };
+
+    const load = async () => {
+      try {
+        const data = await api('/api/guestbook', { method: 'GET' });
+        const entries = data.entries as Entry[];
+        info.textContent = `전체 ${entries.length}개 · 비공개 ${entries.filter((e) => !e.isPublic).length}개`;
+        list.replaceChildren(...entries.map(row));
+      } catch (err) {
+        info.textContent = (err as Error).message;
+      }
+    };
+    let loaded = false;
+    const onTab = (id: string) => {
+      if (id === 'guestbook' && !loaded) {
+        loaded = true;
+        load();
+      }
+    };
+    document.addEventListener('admin:tab', (e) => onTab((e as CustomEvent).detail));
+    if (location.hash === '#guestbook') onTab('guestbook');
+  }
+
+  function setupBeat() {
+    const tapBtn = $<HTMLButtonElement>('[data-tap]');
+    if (!tapBtn) return;
+    const bpmIn = $<HTMLInputElement>('#b-bpm')!;
+    const offIn = $<HTMLInputElement>('#b-offset')!;
+    const barIn = $<HTMLSelectElement>('#b-bar')!;
+    const info = $('[data-tap-info]')!;
+    const status = $('[data-beat-status]')!;
+    const metro = [...document.querySelectorAll<HTMLElement>('[data-metro]')];
+    let taps: number[] = [];
+
+    const apply = () => music.setBeat(Number(bpmIn.value), Number(offIn.value), Number(barIn.value));
+    [bpmIn, offIn, barIn].forEach((el) => el.addEventListener('input', apply));
+    apply();
+
+    // 탭한 곡 시각들로 BPM(간격의 중앙값 → 직선 맞추기)과 첫 박 위치를 계산한다
+    const compute = () => {
+      if (taps.length < 4) return;
+      const gaps = taps.slice(1).map((t, i) => t - taps[i]).sort((a, b) => a - b);
+      const rough = gaps[Math.floor(gaps.length / 2)];
+      const idx = taps.map((t) => Math.round((t - taps[0]) / rough));
+      const n = taps.length;
+      const mx = idx.reduce((a, b) => a + b, 0) / n;
+      const my = taps.reduce((a, b) => a + b, 0) / n;
+      let sxy = 0;
+      let sxx = 0;
+      idx.forEach((x, i) => ((sxy += (x - mx) * (taps[i] - my)), (sxx += (x - mx) ** 2)));
+      const period = sxx ? sxy / sxx : rough;
+      const first = my - period * mx; // 첫 탭(= 마디 첫 박) 시각
+      const bar = period * Number(barIn.value);
+      bpmIn.value = (60 / period).toFixed(2);
+      offIn.value = (((first % bar) + bar) % bar).toFixed(3);
+      apply();
+    };
+
+    const tap = () => {
+      if (music.state !== 'playing') {
+        info.textContent = '먼저 오른쪽 위 SOUND 를 눌러 음악을 켜 주세요.';
+        return;
+      }
+      taps.push(music.time());
+      if (taps.length > 1 && taps[taps.length - 1] < taps[taps.length - 2]) taps = [taps[taps.length - 1]]; // 곡이 처음으로 돌아가면 다시
+      info.textContent = `탭 ${taps.length}번${taps.length < 8 ? ' — 8번 이상 눌러 주세요' : ''}`;
+      compute();
+      tapBtn.classList.add('hit');
+      setTimeout(() => tapBtn.classList.remove('hit'), 90);
+    };
+    tapBtn.addEventListener('click', tap);
+    document.addEventListener('keydown', (e) => {
+      const panel = $('[data-panel="beat"]');
+      if (e.code !== 'Space' || !panel || panel.hidden) return;
+      if ((e.target as HTMLElement).closest('input, textarea, select, button')) return;
+      e.preventDefault();
+      tap();
+    });
+    $('[data-tap-reset]')!.addEventListener('click', () => {
+      taps = [];
+      info.textContent = '탭 0번';
+    });
+    document.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach((b) =>
+      b.addEventListener('click', () => {
+        offIn.value = Math.max(0, Number(offIn.value) + Number(b.dataset.nudge)).toFixed(3);
+        apply();
+      }),
+    );
+
+    // 박자 미리보기: 박마다 네모가 켜진다 (강박은 자홍)
+    const loop = () => {
+      if (!document.contains(tapBtn)) return;
+      const b = music.beat();
+      const bar = Number(barIn.value);
+      metro.forEach((m, i) => {
+        m.hidden = i >= bar;
+        const cur = b ? ((b.index % bar) + bar) % bar : -1;
+        m.className = i === cur && b && b.phase < 0.35 ? (i === 0 ? 'on strong' : 'on') : '';
+      });
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+
+    $('[data-beat-save]')!.addEventListener('click', async () => {
+      status.textContent = '저장하는 중…';
+      try {
+        await api('/api/admin/music', {
+          method: 'POST',
+          body: JSON.stringify({ bpm: Number(bpmIn.value), offset: Number(offIn.value), beatsPerBar: Number(barIn.value) }),
+        });
+        status.textContent = '저장했어요. 1–2분 뒤 사이트에 반영돼요.';
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      }
+    });
+  }
+
+  function setupPosts() {
+    const status = $('[data-posts-status]');
+    if (!status) return;
+    document.querySelectorAll<HTMLButtonElement>('[data-del-slug]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        if (!confirm(`「${b.dataset.delTitle}」을(를) 지울까요? 이미지도 함께 지워져요.`)) return;
+        b.disabled = true;
+        status.textContent = '지우는 중…';
+        try {
+          await api('/api/admin/posts', { method: 'DELETE', body: JSON.stringify({ kind: b.dataset.delKind, slug: b.dataset.delSlug }) });
+          b.closest('li')?.remove();
+          status.textContent = '지웠어요. 1–2분 뒤 사이트에서 사라져요.';
+        } catch (err) {
+          status.textContent = (err as Error).message;
+          b.disabled = false;
+        }
+      }),
+    );
+  }
+
+  document.addEventListener('astro:page-load', () => {
+    setupLogin();
+    setupTabs();
+    setupUpload();
+    setupGuestbook();
+    setupBeat();
+    setupPosts();
+  });
+</script>
+
+<style>
+  .head {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+  }
+  code,
+  kbd {
+    font-family: var(--font-pixel);
+    font-size: 12px;
+    color: var(--color-accent-light);
+  }
+  .h {
+    font-size: 18px;
+  }
+  .panel-box {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 480px;
+    padding: var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+    border-bottom: 1px dashed var(--color-border);
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+  [role='tab'] {
+    position: relative;
+    min-height: var(--tap-min);
+    font-size: var(--text-menu);
+    color: var(--color-text-muted);
+  }
+  [role='tab']:hover,
+  [role='tab'][aria-selected='true'] {
+    color: var(--color-text);
+  }
+  [role='tab'][aria-selected='true']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-accent);
+  }
+  .warn {
+    margin-bottom: var(--space-5);
+    padding: var(--space-3) var(--space-4);
+    border-left: 2px solid var(--color-accent);
+    background: var(--color-surface);
+    font-size: var(--text-caption);
+  }
+
+  /* 폼 공통 */
+  .field {
+    display: grid;
+    gap: var(--space-2);
+    align-content: start;
+  }
+  label,
+  legend {
+    font-size: var(--text-menu);
+    color: var(--color-text);
+  }
+  .admin-root :global(input[type='text']),
+  .admin-root :global(input[type='password']),
+  .admin-root :global(input[type='date']),
+  .admin-root :global(input[type='number']),
+  .admin-root :global(select),
+  .admin-root :global(textarea) {
+    width: 100%;
+    min-height: var(--tap-min);
+    padding: var(--space-3);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    color: var(--color-text);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    color-scheme: dark;
+  }
+  .admin-root :global(textarea) {
+    resize: vertical;
+    font-family: var(--font-sans);
+  }
+  input[type='file'] {
+    min-height: var(--tap-min);
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+  .admin-root :global(input:focus-visible),
+  .admin-root :global(select:focus-visible),
+  .admin-root :global(textarea:focus-visible) {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-text-muted);
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .admin-root :global(.btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-5);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-menu);
+    color: var(--color-text);
+    transition: border-color var(--dur-fast) var(--step-fast), background var(--dur-fast) var(--step-fast);
+  }
+  .admin-root :global(.btn:hover) {
+    border-color: var(--color-accent);
+  }
+  /* 흰 글씨 대비 4.5:1 이상을 위해 딥 와인 배경 + 자홍 테두리 */
+  .admin-root :global(.btn.primary) {
+    background: var(--color-accent-deep);
+    border: 2px solid var(--color-accent);
+  }
+  .admin-root :global(.btn.primary:hover) {
+    border-color: var(--color-accent-light);
+  }
+  .admin-root :global(.btn.danger:hover) {
+    border-color: var(--color-accent-light);
+    color: var(--color-accent-light);
+  }
+  .admin-root :global(.btn:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .admin-root :global(.actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .status {
+    font-size: var(--text-caption);
+    color: var(--color-accent-light);
+  }
+  .status a {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+
+  /* 올리기 */
+  .upload {
+    display: grid;
+    gap: var(--space-6);
+    max-width: 880px;
+  }
+  .kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .kinds legend {
+    margin-bottom: var(--space-2);
+  }
+  .kind {
+    position: relative;
+  }
+  .kind input {
+    position: absolute;
+    opacity: 0;
+  }
+  .kind span {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-menu);
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+  .kind input:checked + span {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+  }
+  .kind input:focus-visible + span {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-5);
+  }
+  .span2 {
+    grid-column: 1 / -1;
+  }
+  .previews {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .previews img {
+    width: 96px;
+    height: 64px;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+  }
+
+  /* 방명록 관리 */
+  .gb {
+    list-style: none;
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-4);
+    max-width: 880px;
+  }
+  .gb :global(.gb-item) {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .gb :global(.gb-head) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .gb :global(.gb-who) {
+    color: var(--color-text);
+  }
+  .gb :global(.badge) {
+    padding: 0 var(--space-2);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .gb :global(.badge.pub) {
+    border-color: var(--color-accent);
+    color: var(--color-accent-light);
+  }
+  .gb :global(.gb-msg) {
+    white-space: pre-wrap;
+  }
+  .gb :global(label) {
+    margin-top: var(--space-2);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+
+  /* 박자 맞추기 */
+  .beat {
+    display: grid;
+    gap: var(--space-5);
+    max-width: 720px;
+  }
+  .steps {
+    margin: 0;
+    padding-left: 1.3em;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .steps strong {
+    color: var(--color-text);
+  }
+  .tap-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-6);
+  }
+  .tap {
+    width: 160px;
+    height: 96px;
+    border: 2px solid var(--color-accent);
+    font-family: var(--font-pixel);
+    font-size: 20px;
+    color: var(--color-text);
+  }
+  .tap:global(.hit),
+  .tap:active {
+    background: var(--color-accent);
+  }
+  .metro {
+    display: flex;
+    gap: var(--space-3);
+  }
+  .metro span {
+    width: 28px;
+    height: 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .metro span:global(.on) {
+    background: var(--color-node);
+  }
+  .metro span:global(.on.strong) {
+    background: var(--color-accent);
+  }
+  .nudge {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .nudge .btn {
+    padding: 0 var(--space-3);
+  }
+
+  /* 올린 글 */
+  .posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    max-width: 880px;
+  }
+  .posts li {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
+    border-bottom: 1px dashed var(--color-border);
+  }
+  .posts a {
+    color: var(--color-text);
+  }
+  .posts a:hover {
+    color: var(--color-accent-light);
+  }
+  .kind-l {
+    color: var(--color-accent-light);
+  }
+
+  @media (max-width: 640px) {
+    .grid2,
+    .grid3 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .posts li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .posts .kind-l,
+    .posts .caption {
+      grid-column: 1;
+    }
+  }
+</style>

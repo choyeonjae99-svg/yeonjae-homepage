@@ -7,13 +7,24 @@
  *  - 버튼을 누르는 순간 바로 재생되도록(모바일 자동재생 제한), 페이지가 한가해지면
  *    플레이어를 미리 준비해 둔다. 소리는 버튼을 눌러야만 난다.
  *  - 켜고 끌 때 짧은 페이드 인/아웃, 끝나면 처음부터 반복.
- *  - YouTube 소리는 다른 사이트(iframe) 것이라 Web Audio 로 볼륨을 읽을 수 없다.
- *    그래서 연결망 반응용 level 은 재생 중일 때 박자처럼 흉내 낸 값이다.
+ *  - YouTube 소리는 다른 사이트(iframe) 것이라 Web Audio 로 소리를 분석할 수 없다.
+ *    대신 곡의 BPM·첫 박 위치(music.json)와 플레이어의 실제 재생 위치로 "지금 몇 번째 박인지"를 계산한다.
+ *    → beat() 가 연결망에 박 정보를 준다. 멈추거나 되감아도 재생 위치를 따라간다.
  */
 
 type State = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
+/** 연결망에 넘기는 박 정보 */
+export interface BeatInfo {
+  index: number; // 곡 처음부터 몇 번째 박인지
+  phase: number; // 박 안에서의 위치 0–1 (0 = 박이 막 친 순간)
+  downbeat: boolean; // 마디 첫 박(강박)인지
+  period: number; // 한 박 길이 (초)
+  strength: number; // 0–1, 켜고 끌 때 서서히
+}
+
 type YTPlayer = {
+  getCurrentTime(): number;
   playVideo(): void;
   pauseVideo(): void;
   setVolume(v: number): void;
@@ -45,27 +56,55 @@ class Music extends EventTarget {
   private wantPlay = false;
   private fadeTimer = 0;
   private preparing: Promise<void> | null = null;
-  private startedAt = 0;
   private envelope = 0; // 0–1, 켜질 때 올라가고 꺼질 때 내려간다
+  private bpm = 0;
+  private offset = 0;
+  private beatsPerBar = 4;
+  private lastRead = { song: 0, at: 0 };
 
-  configure(videoId: string, volume = 60) {
+  configure(videoId: string, volume = 60, beat?: { bpm: number; offset: number; beatsPerBar: number }) {
     this.videoId = videoId;
     this.volume = volume;
+    if (beat) this.setBeat(beat.bpm, beat.offset, beat.beatsPerBar);
+  }
+
+  /** 박자 설정 (관리자 페이지의 박자 맞추기에서 바로 바꿔 볼 때도 쓴다) */
+  setBeat(bpm: number, offset: number, beatsPerBar = 4) {
+    this.bpm = bpm;
+    this.offset = offset;
+    this.beatsPerBar = beatsPerBar;
+  }
+
+  /**
+   * 곡의 현재 재생 위치(초). 플레이어 값은 띄엄띄엄 갱신되므로
+   * 값이 그대로면 흐른 시간만큼 더해서 매끄럽게 만든다.
+   */
+  time(now = performance.now()) {
+    if (!this.player || !this.ready) return 0;
+    const song = this.player.getCurrentTime?.() ?? 0;
+    if (song !== this.lastRead.song || this.state !== 'playing') this.lastRead = { song, at: now };
+    return this.state === 'playing' ? this.lastRead.song + (now - this.lastRead.at) / 1000 : song;
+  }
+
+  /** 재생 중일 때만 박 정보, 아니면 null */
+  beat(now = performance.now()): BeatInfo | null {
+    const target = this.state === 'playing' ? 1 : 0;
+    this.envelope += (target - this.envelope) * 0.08;
+    if (this.envelope < 0.02 || !this.bpm) return null;
+    const period = 60 / this.bpm;
+    const pos = (this.time(now) - this.offset) / period;
+    const index = Math.floor(pos);
+    return {
+      index,
+      phase: pos - index,
+      downbeat: ((index % this.beatsPerBar) + this.beatsPerBar) % this.beatsPerBar === 0,
+      period,
+      strength: this.envelope,
+    };
   }
 
   get on() {
     return this.state === 'playing' || (this.state === 'loading' && this.wantPlay);
-  }
-
-  /** 연결망 반응용 0–1 값 (재생 중 박자 흉내 × 페이드 정도) */
-  level(now = performance.now()) {
-    const target = this.state === 'playing' ? 1 : 0;
-    this.envelope += (target - this.envelope) * 0.05;
-    if (this.envelope < 0.01) return 0;
-    const t = (now - this.startedAt) / 1000;
-    const beat = Math.pow(Math.max(0, Math.cos(t * Math.PI * (92 / 60))), 6); // 약 92 BPM
-    const sway = 0.5 + 0.5 * Math.sin(t * 0.4);
-    return this.envelope * (0.25 + 0.45 * beat + 0.3 * sway);
   }
 
   /** 소리 없이 플레이어만 미리 만들어 둔다 */
@@ -113,7 +152,6 @@ class Music extends EventTarget {
                 this.player!.playVideo();
               }
               if (e.data === YT.PlayerState.PLAYING && this.wantPlay && this.state !== 'playing') {
-                this.startedAt = performance.now();
                 this.set('playing');
                 this.fadeTo(this.volume);
               }
