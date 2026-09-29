@@ -19,7 +19,7 @@
     if (!canvas || synapse) return;
     try {
       synapse = new Synapse(canvas);
-      synapse.setLevelSource(() => music.level());
+      synapse.setBeatSource(() => music.beat());
       (window as unknown as { synapse?: Synapse }).synapse = synapse;
     } catch {
       // Canvas를 못 쓰는 환경이면 도트 격자 배경만 남긴다

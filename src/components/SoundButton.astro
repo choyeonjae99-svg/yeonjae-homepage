@@ -32,7 +32,7 @@
     error: 'NO SOUND',
   } as const;
 
-  music.configure(MUSIC.youtubeId, MUSIC.volume);
+  music.configure(MUSIC.youtubeId, MUSIC.volume, MUSIC);
 
   // 이 스크립트는 한 번만 실행되고, 버튼은 persist 되므로 리스너도 유지된다.
   const btn = document.getElementById('sound-toggle');
