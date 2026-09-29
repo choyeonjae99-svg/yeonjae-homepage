@@ -1,0 +1,201 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { Image } from 'astro:assets';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { formatDate } from '../../data/format';
+
+export const getStaticPaths = (async () => {
+  const entries = (await getCollection('works', ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+  );
+  return entries.map((entry, i) => ({
+    params: { slug: entry.id },
+    props: { entry, prev: entries[i - 1], next: entries[i + 1] },
+  }));
+}) satisfies GetStaticPaths;
+
+interface Props {
+  entry: CollectionEntry<'works'>;
+  prev?: CollectionEntry<'works'>;
+  next?: CollectionEntry<'works'>;
+}
+
+const { entry, prev, next } = Astro.props;
+const d = entry.data;
+const { Content } = await render(entry);
+const CAT = { writing: { en: 'Writing', ko: '글' }, drawing: { en: 'Drawing', ko: '그림' } };
+const isDrawing = d.category === 'drawing';
+// 그림인데 images 가 비어 있으면 썸네일을 크게 보여준다
+const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.thumbnail] : [];
+---
+
+<BaseLayout title={d.title} description={d.summary || undefined}>
+  <article class:list={['work', d.category]}>
+    <a class="back pixel-label" href={`/works#${d.category}`}>
+      <svg width="8" height="8" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="0" y="3" width="8" height="2" /><rect x="2" y="1" width="2" height="2" /><rect x="2" y="5" width="2" height="2" />
+      </svg>
+      그 외 작업물
+    </a>
+
+    <header class="head">
+      <p class="pixel-label kind">
+        {CAT[d.category].en} · <time datetime={d.date.toISOString().slice(0, 10)}>{formatDate(d.date)}</time>
+      </p>
+      <h1 class="page-title">{d.title}</h1>
+      {d.summary && <p class="lead">{d.summary}</p>}
+      {d.tags.length > 0 && (
+        <ul class="tags" aria-label="태그">
+          {d.tags.map((t) => <li>{t}</li>)}
+        </ul>
+      )}
+    </header>
+
+    {!isDrawing && d.thumbnail && (
+      <figure class="cover">
+        <Image src={d.thumbnail} alt={d.thumbnailAlt} widths={[800, 1600]} sizes="(max-width: 900px) 100vw, 860px" format="webp" />
+      </figure>
+    )}
+
+    {figures.length > 0 && (
+      <div class="figures">
+        {figures.map((img, i) => (
+          <figure>
+            <Image
+              src={img}
+              alt={i === 0 && d.thumbnailAlt ? d.thumbnailAlt : `${d.title} ${i + 1}`}
+              widths={[800, 1600, 2000]}
+              sizes="(max-width: 1440px) calc(100vw - 96px), 1344px"
+              format="webp"
+            />
+          </figure>
+        ))}
+      </div>
+    )}
+
+    <div class="prose body">
+      <Content />
+    </div>
+
+    {(prev || next) && (
+      <nav class="pager" aria-label="다른 작업물">
+        {prev ? (
+          <a href={`/works/${prev.id}`}>
+            <span class="pixel-label">Newer</span>
+            <span>{prev.data.title}</span>
+          </a>
+        ) : <span />}
+        {next && (
+          <a href={`/works/${next.id}`} class="next">
+            <span class="pixel-label">Older</span>
+            <span>{next.data.title}</span>
+          </a>
+        )}
+      </nav>
+    )}
+  </article>
+</BaseLayout>
+
+<style>
+  .work {
+    display: grid;
+    gap: var(--space-7);
+  }
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    justify-self: start;
+    margin-bottom: calc(var(--space-7) * -1 + var(--space-3));
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .back svg {
+    fill: currentColor;
+  }
+  .back:hover {
+    color: var(--color-text);
+  }
+  .head,
+  .body,
+  .cover {
+    width: 100%;
+    max-width: 44em;
+  }
+  .head {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .kind {
+    color: var(--color-accent-light);
+  }
+  .page-title {
+    text-wrap: balance;
+  }
+  .lead {
+    color: var(--color-text-muted);
+  }
+  .tags {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .tags li {
+    padding: 2px var(--space-2);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  figure {
+    margin: 0;
+  }
+  figure img {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--color-border);
+  }
+  .figures {
+    display: grid;
+    gap: var(--space-5);
+  }
+  /* 글: 본문을 조금 더 읽기 좋게 */
+  .writing .body :global(p) {
+    color: var(--color-text);
+  }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+    padding-top: var(--space-6);
+    border-top: 1px dashed var(--color-border);
+  }
+  .pager a {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4) 0;
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .pager a:hover {
+    color: var(--color-text);
+  }
+  .pager .next {
+    grid-column: 2;
+    text-align: right;
+  }
+  @media (max-width: 640px) {
+    .pager {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pager .next {
+      grid-column: 1;
+      text-align: left;
+    }
+  }
+</style>

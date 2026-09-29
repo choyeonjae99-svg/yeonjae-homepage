@@ -1,0 +1,395 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection, getEntry, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import cv from '../../content/about/cv.json';
+
+const profile = await getEntry('profile', 'profile');
+if (!profile) throw new Error('src/content/about/profile.md 가 없습니다');
+const { Content: Intro } = await render(profile);
+const p = profile.data;
+
+// 논문: 학위논문 먼저, 그다음 학술지 최신순
+const papers = (await getCollection('papers')).sort((a, b) => {
+  if (a.data.type !== b.data.type) return a.data.type === 'thesis' ? -1 : 1;
+  return b.data.year * 12 + (b.data.month ?? 0) - (a.data.year * 12 + (a.data.month ?? 0));
+});
+
+const TYPE_LABEL = { thesis: 'Thesis', journal: 'Journal', conference: 'Conference' } as const;
+const TYPE_KO = { thesis: '석사학위논문', journal: 'KCI 등재 학술지', conference: '학술대회' } as const;
+const pad = (n: number) => String(n).padStart(2, '0');
+
+const sections = [
+  { id: 'education', en: 'Education', ko: '학력', rows: cv.education },
+  { id: 'projects', en: 'R&D Projects', ko: '참여 연구 과제', rows: cv.projects },
+  { id: 'awards', en: 'Awards', ko: '수상', rows: cv.awards },
+];
+---
+
+<BaseLayout title="소개" description={`${p.name} — ${p.headline}`}>
+  <section class="hero" aria-labelledby="about-title">
+    <figure class="photo">
+      <Image
+        src={p.photo}
+        alt={p.photoAlt}
+        widths={[240, 480]}
+        sizes="(max-width: 640px) 160px, 240px"
+        format="webp"
+        loading="eager"
+        fetchpriority="high"
+      />
+    </figure>
+
+    <div class="who">
+      <p class="pixel-label">About</p>
+      <h1 class="page-title" id="about-title">
+        {p.name} <span class="en" lang="en">{p.nameEn}</span>
+      </h1>
+      <p class="headline">{p.headline}</p>
+      <div class="prose intro"><Intro /></div>
+
+      {p.interests.length > 0 && (
+        <ul class="chips" aria-label="관심 분야">
+          {p.interests.map((i) => <li>{i}</li>)}
+        </ul>
+      )}
+
+      <p class="contact">
+        <span class="pixel-label">E-mail</span>
+        <a href={`mailto:${p.email}`}>{p.email}</a>
+      </p>
+    </div>
+  </section>
+
+  {sections.map((s) => (
+    <section class="block" aria-labelledby={s.id}>
+      <h2 class="block-head" id={s.id}>
+        <span class="pixel-label">{s.en}</span>
+        <span class="ko">{s.ko}</span>
+      </h2>
+      <ul class="rows">
+        {s.rows.map((r) => (
+          <li class="row">
+            <span class="when pixel-label">{r.period}</span>
+            <div class="what">
+              <p>{r.title}</p>
+              {r.note && <p class="caption">{r.note}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+
+  <section class="block" aria-labelledby="papers">
+    <h2 class="block-head" id="papers">
+      <span class="pixel-label">Papers</span>
+      <span class="ko">논문</span>
+    </h2>
+    <ol class="papers">
+      {papers.map(({ data: d }) => (
+        <li class="paper">
+          <p class="paper-type">
+            <span class="pixel-label">{TYPE_LABEL[d.type]}</span>
+            <span class="caption">{TYPE_KO[d.type]} · {d.year}{d.month ? `.${pad(d.month)}` : ''}</span>
+          </p>
+          <h3 class="paper-title">
+            {d.title}
+            {d.subtitle && <span class="sub">: {d.subtitle}</span>}
+          </h3>
+          {d.titleEn && <p class="caption en-title" lang="en">{d.titleEn}</p>}
+          <p class="caption meta">
+            {d.authors.map((a, i) => (
+              <>
+                <span class:list={{ me: a === p.name }}>{a}</span>
+                {i < d.authors.length - 1 && ', '}
+              </>
+            ))}
+            {' · '}
+            {d.venue}
+            {d.volume && ` · ${d.volume}`}
+          </p>
+          <p class="summary">{d.summary}</p>
+          {d.keywords.length > 0 && (
+            <ul class="chips small" aria-label="키워드">
+              {d.keywords.map((k) => <li>{k}</li>)}
+            </ul>
+          )}
+          {d.note && <p class="award">{d.note}</p>}
+          <p class="links">
+            {d.links.length > 0 ? (
+              d.links.map((l) => (
+                <a class="pixel-label" href={l.href} target="_blank" rel="noopener noreferrer">
+                  {l.label}
+                  <svg width="8" height="8" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
+                    <rect x="2" y="0" width="6" height="2" /><rect x="6" y="0" width="2" height="6" />
+                    <rect x="4" y="2" width="2" height="2" /><rect x="2" y="4" width="2" height="2" />
+                    <rect x="0" y="6" width="2" height="2" />
+                  </svg>
+                  <span class="visually-hidden">(새 창)</span>
+                </a>
+              ))
+            ) : (
+              <span class="caption">[여기에 원문 링크]</span>
+            )}
+          </p>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="block" aria-labelledby="skills">
+    <h2 class="block-head" id="skills">
+      <span class="pixel-label">Skills</span>
+      <span class="ko">역량</span>
+    </h2>
+    <ul class="rows">
+      {cv.skills.map((r) => (
+        <li class="row">
+          <span class="when skill">{r.title}</span>
+          <div class="what">
+            <p class="caption">{r.note}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  /* ── 자기소개 ─────────────────────────── */
+  .hero {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--space-7);
+    align-items: start;
+    margin-bottom: var(--space-8);
+  }
+  .photo {
+    position: relative;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .photo img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+  }
+  /* 왼쪽 위 모서리의 자홍 픽셀 */
+  .photo::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: -5px;
+    width: var(--pixel-logo);
+    height: var(--pixel-logo);
+    background: var(--color-accent);
+  }
+  .who {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40em;
+  }
+  .who > .pixel-label {
+    margin-bottom: calc(var(--space-2) * -1);
+  }
+  .page-title .en {
+    font-size: var(--text-body);
+    color: var(--color-text-muted);
+    margin-left: var(--space-2);
+  }
+  .headline {
+    color: var(--color-accent-light);
+  }
+  .intro {
+    display: grid;
+    gap: var(--space-3);
+    color: var(--color-text-muted);
+  }
+  .chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .chips li {
+    padding: 2px var(--space-2);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+  .chips.small li {
+    font-size: 12px;
+  }
+  .contact {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+  .contact a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    color: var(--color-text);
+    text-decoration: underline;
+    text-decoration-color: var(--color-accent);
+    text-underline-offset: 4px;
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .contact a:hover {
+    color: var(--color-accent-light);
+  }
+
+  /* ── 공통 블록 ────────────────────────── */
+  .block {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: var(--space-7);
+    padding: var(--space-7) 0;
+    border-top: 1px dashed var(--color-border);
+  }
+  .block-head {
+    display: grid;
+    gap: var(--space-1);
+    align-content: start;
+    font-size: var(--text-body);
+  }
+  .block-head .ko {
+    color: var(--color-text-muted);
+    font-size: var(--text-caption);
+  }
+  .rows,
+  .papers {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-5);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+  .when {
+    padding-top: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .when.skill {
+    padding-top: 0;
+    font-size: var(--text-caption);
+    color: var(--color-text);
+  }
+  .what {
+    display: grid;
+    gap: var(--space-1);
+    max-width: 44em;
+  }
+
+  /* ── 논문 ─────────────────────────────── */
+  .papers {
+    gap: var(--space-7);
+  }
+  .paper {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 48em;
+  }
+  .paper + .paper {
+    padding-top: var(--space-7);
+    border-top: 1px dashed var(--color-border);
+  }
+  .paper-type {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+  .paper-type .pixel-label {
+    color: var(--color-accent-light);
+  }
+  .paper-title {
+    font-size: 18px;
+    line-height: 1.5;
+    text-wrap: balance;
+  }
+  .paper-title .sub {
+    color: var(--color-text-muted);
+  }
+  .meta .me {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-decoration-color: var(--color-accent);
+    text-underline-offset: 3px;
+  }
+  .summary {
+    font-size: 15px;
+    color: var(--color-text-muted);
+    margin-top: var(--space-2);
+  }
+  .award {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-caption);
+    color: var(--color-accent-light);
+  }
+  .award::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--color-accent);
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    color: var(--color-text);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .links a svg {
+    fill: var(--color-accent);
+  }
+  .links a:hover {
+    color: var(--color-accent-light);
+  }
+
+  /* ── 반응형 ───────────────────────────── */
+  @media (max-width: 1024px) {
+    .hero,
+    .block {
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: var(--space-6);
+    }
+  }
+  @media (max-width: 640px) {
+    .hero,
+    .block {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-5);
+    }
+    .photo {
+      width: 160px;
+    }
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-1);
+    }
+    .when {
+      padding-top: 0;
+    }
+    .page-title .en {
+      display: block;
+      margin: var(--space-1) 0 0;
+    }
+  }
+</style>

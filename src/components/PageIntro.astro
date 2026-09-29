@@ -1,0 +1,31 @@
+---
+interface Props {
+  /** 영문 픽셀 라벨 (예: ABOUT) */
+  label: string;
+  title: string;
+  lead?: string;
+}
+
+const { label, title, lead } = Astro.props;
+---
+
+<div class="intro">
+  <p class="pixel-label">{label}</p>
+  <h1 class="page-title">{title}</h1>
+  {lead && <p class="lead">{lead}</p>}
+</div>
+
+<style>
+  .intro {
+    display: grid;
+    gap: var(--space-3);
+    margin-bottom: var(--space-8);
+  }
+  .page-title {
+    text-wrap: balance;
+  }
+  .lead {
+    max-width: 38em;
+    color: var(--color-text-muted);
+  }
+</style>

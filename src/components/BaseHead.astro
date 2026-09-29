@@ -1,0 +1,52 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const SITE_NAME = '조연재';
+const DEFAULT_DESC = '조연재 — 콘텐츠 플레이어의 경험을 연구합니다. 게임 연구 · 사용자 연구 · 시각 디자인';
+const { title, description = DEFAULT_DESC } = Astro.props;
+const fullTitle = title ? `${title} — ${SITE_NAME}` : `${SITE_NAME} CHOYEONJAE`;
+// 공유 미리보기용 절대 주소. 배포 도메인이 정해지면 astro.config.mjs 의 site 를 바꾼다
+const base = Astro.site ?? Astro.url;
+const canonical = new URL(Astro.url.pathname, base);
+const ogImage = new URL('/og.png', base);
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1C1B1F" />
+<meta name="color-scheme" content="dark" />
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="canonical" href={canonical} />
+
+<!-- 링크 공유 미리보기 (카카오톡·슬랙·SNS) -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content={SITE_NAME} />
+<meta property="og:locale" content="ko_KR" />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="CHOYEONJAE — 픽셀 노드 연결망 위의 로고" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<!-- 폰트: 굵기 400 하나만 불러온다 -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400&family=Silkscreen:wght@400&display=swap"
+/>
+<!-- 로고 전용: 로고 글자만 담은 아주 작은 폰트 파일을 받는다 -->
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&text=CHOYEONJAE&display=swap"
+/>

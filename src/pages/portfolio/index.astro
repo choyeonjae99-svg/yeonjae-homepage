@@ -1,0 +1,173 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageIntro from '../../components/PageIntro.astro';
+import PortfolioCard from '../../components/PortfolioCard.astro';
+import OwnerAddCard from '../../components/OwnerAddCard.astro';
+import { githubNewFile, githubUpload } from '../../data/github';
+
+const all = (await getCollection('portfolio', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+
+const TABS = [
+  { id: 'research', label: '연구 포트폴리오', en: 'Research' },
+  { id: 'design', label: '디자인 포트폴리오', en: 'Design' },
+] as const;
+
+// 디자인 포트폴리오 추가 (주인 전용): GitHub 에서 템플릿이 채워진 새 파일 화면을 연다
+const dir = 'src/content/portfolio/design';
+const template = (await import('../../content/portfolio/design/_template.md?raw')).default as string;
+const addSteps = [
+  { label: '이미지 올리기', href: githubUpload(dir), note: '썸네일 3:2 (1200×800)' },
+  { label: '내용 쓰기', href: githubNewFile(dir, 'new-project.md', template), note: '템플릿이 채워진 새 글이 열려요' },
+];
+---
+
+<BaseLayout title="포트폴리오">
+  <PageIntro label="Portfolio" title="포트폴리오" lead="연구와 디자인 작업을 모았습니다." />
+
+  <div class="tabs" role="tablist" aria-label="포트폴리오 분류" data-tabs>
+    {TABS.map((t, i) => (
+      <button
+        type="button"
+        role="tab"
+        id={`tab-${t.id}`}
+        aria-controls={`panel-${t.id}`}
+        aria-selected={i === 0 ? 'true' : 'false'}
+        tabindex={i === 0 ? 0 : -1}
+        data-tab={t.id}
+      >
+        {t.label}
+        <span class="count pixel-label">{all.filter((e) => e.data.category === t.id).length}</span>
+      </button>
+    ))}
+  </div>
+
+  {TABS.map((t, i) => {
+    const items = all.filter((e) => e.data.category === t.id);
+    return (
+      <section
+        class="panel"
+        role="tabpanel"
+        id={`panel-${t.id}`}
+        aria-labelledby={`tab-${t.id}`}
+        hidden={i !== 0}
+        data-panel={t.id}
+      >
+        {items.length === 0 && (
+          <p class="empty caption">{t.label}는 준비 중입니다.</p>
+        )}
+        <ul class="grid">
+          {items.map(({ id, data }) => (
+            <li>
+              <PortfolioCard
+                href={`/portfolio/${id}`}
+                title={data.title}
+                subtitle={data.subtitle}
+                label={t.en}
+                period={data.period}
+                summary={data.summary}
+                thumbnail={data.thumbnail}
+                thumbnailAlt={data.thumbnailAlt}
+              />
+            </li>
+          ))}
+
+          {t.id === 'design' && <OwnerAddCard title="디자인 포트폴리오 추가" steps={addSteps} />}
+        </ul>
+
+      </section>
+    );
+  })}
+</BaseLayout>
+
+<script>
+  function setup() {
+    const list = document.querySelector<HTMLElement>('[data-tabs]');
+    if (!list) return;
+    const tabs = [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+
+    const select = (id: string, focus = false) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.tab === id;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+      });
+      document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => {
+        p.hidden = p.dataset.panel !== id;
+      });
+      history.replaceState(history.state, '', id === tabs[0].dataset.tab ? location.pathname : `#${id}`);
+    };
+
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(t.dataset.tab!));
+      t.addEventListener('keydown', (e) => {
+        const next = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : -1;
+        if (next < 0 && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        select(tabs[(next + tabs.length) % tabs.length].dataset.tab!, true);
+      });
+    });
+
+    const hash = location.hash.slice(1);
+    if (tabs.some((t) => t.dataset.tab === hash)) select(hash);
+  }
+
+  document.addEventListener('astro:page-load', setup);
+</script>
+
+<style>
+  .tabs {
+    display: flex;
+    gap: var(--space-5);
+    margin-bottom: var(--space-6);
+    border-bottom: 1px dashed var(--color-border);
+  }
+  [role='tab'] {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    font-size: var(--text-menu);
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  [role='tab']:hover,
+  [role='tab'][aria-selected='true'] {
+    color: var(--color-text);
+  }
+  /* 선택된 탭: 아래에 자홍 픽셀 선 */
+  [role='tab'][aria-selected='true']::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-accent);
+  }
+  .count {
+    color: var(--color-text-muted);
+  }
+  [aria-selected='true'] .count {
+    color: var(--color-accent-light);
+  }
+
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: var(--space-5);
+  }
+  .grid > li {
+    min-width: 0;
+  }
+  .empty {
+    padding-bottom: var(--space-5);
+  }
+</style>

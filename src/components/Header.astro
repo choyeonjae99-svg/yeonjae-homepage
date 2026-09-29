@@ -1,0 +1,277 @@
+---
+import Logo from './Logo.astro';
+import SoundButton from './SoundButton.astro';
+import { NAV } from '../data/site';
+
+interface Props {
+  /** home: 캔버스 위에 떠 있는 고정 헤더 / page: 하위 페이지 상단 헤더 */
+  variant?: 'home' | 'page';
+}
+
+const { variant = 'page' } = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (href: string) => path === href || path.startsWith(`${href}/`);
+
+// 픽셀 X 아이콘: 2px 칸을 대각선으로 찍는다
+const xCells = [1, 2, 3, 4, 5, 6].flatMap((i) => [
+  [i * 2, i * 2],
+  [14 - i * 2, i * 2],
+]);
+---
+
+<header class:list={['site-header', variant]} data-header>
+  <Logo />
+
+  <div class="right">
+    <nav class="nav-inline" aria-label="주 메뉴">
+      {NAV.map((item) => (
+        <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>{item.label}</a>
+      ))}
+    </nav>
+
+    <SoundButton />
+
+    <button
+      class="menu-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="mobile-menu"
+      aria-label="메뉴 열기"
+      data-menu-toggle
+    >
+      <svg class="icon-open" width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="0" y="3" width="16" height="2" /><rect x="0" y="7" width="16" height="2" /><rect x="0" y="11" width="16" height="2" />
+      </svg>
+      <svg class="icon-close" width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
+        {xCells.map(([x, y]) => <rect x={x} y={y} width="2" height="2" />)}
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="mobile-menu" id="mobile-menu" data-mobile-menu hidden>
+  <nav aria-label="주 메뉴 (모바일)">
+    <ul>
+      {NAV.map((item) => (
+        <li>
+          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+            <i aria-hidden="true"></i>{item.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</div>
+
+<script>
+  const MOBILE = window.matchMedia('(max-width: 640px)');
+
+  function setup() {
+    const toggle = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
+    const menu = document.querySelector<HTMLElement>('[data-mobile-menu]');
+    if (!toggle || !menu) return;
+
+    const background = () =>
+      document.querySelectorAll<HTMLElement>('main, [data-footer], [data-stage]');
+
+    const open = () => {
+      menu.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-label', '메뉴 닫기');
+      document.documentElement.dataset.menuOpen = '';
+      background().forEach((el) => (el.inert = true));
+      menu.querySelector<HTMLAnchorElement>('a')?.focus();
+    };
+
+    const close = (returnFocus = false) => {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', '메뉴 열기');
+      delete document.documentElement.dataset.menuOpen;
+      background().forEach((el) => (el.inert = false));
+      if (returnFocus) toggle.focus();
+    };
+
+    toggle.addEventListener('click', () => (menu.hidden ? open() : close(true)));
+    menu.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('a')) close();
+    });
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close(true);
+    };
+    const onResize = (e: MediaQueryListEvent) => {
+      if (!e.matches) close();
+    };
+    document.addEventListener('keydown', onKey);
+    MOBILE.addEventListener('change', onResize);
+
+    // 페이지 이동 전에 정리 (헤더는 새 페이지 것으로 교체된다)
+    document.addEventListener(
+      'astro:before-swap',
+      () => {
+        close();
+        document.removeEventListener('keydown', onKey);
+        MOBILE.removeEventListener('change', onResize);
+      },
+      { once: true },
+    );
+  }
+
+  document.addEventListener('astro:page-load', setup);
+</script>
+
+<style>
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-5);
+    height: var(--header-h);
+    z-index: 20;
+  }
+  .site-header.home {
+    position: fixed;
+    top: calc(var(--edge-top) + env(safe-area-inset-top, 0px));
+    left: var(--gutter);
+    right: var(--gutter);
+  }
+  .site-header.page {
+    position: relative;
+    margin: var(--edge-top) var(--gutter) 0;
+  }
+
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+  }
+
+  .nav-inline {
+    display: flex;
+    gap: 28px;
+    font-size: var(--text-menu);
+  }
+  .nav-inline a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    color: var(--color-text-muted);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .nav-inline a:hover,
+  .nav-inline a[aria-current='page'] {
+    color: var(--color-text);
+  }
+  /* 현재 페이지: 앞에 작은 자홍 픽셀 */
+  .nav-inline a[aria-current='page']::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    background: var(--color-accent);
+  }
+
+  .menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    margin-right: calc(var(--space-3) * -1);
+    color: var(--color-text);
+  }
+  .menu-toggle svg {
+    fill: currentColor;
+  }
+  .menu-toggle .icon-close,
+  .menu-toggle[aria-expanded='true'] .icon-open {
+    display: none;
+  }
+  .menu-toggle[aria-expanded='true'] .icon-close {
+    display: block;
+  }
+
+  /* 모바일 전체 화면 메뉴 */
+  .mobile-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: flex;
+    align-items: flex-end;
+    padding: calc(var(--edge-top) + var(--header-h) + var(--space-7)) var(--gutter)
+      calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+    background-color: var(--color-bg);
+    background-image: radial-gradient(var(--color-grid) 1px, transparent 1.5px);
+    background-size: var(--grid-step) var(--grid-step);
+    animation: menu-in 0.24s var(--step-fast);
+  }
+  .mobile-menu[hidden] {
+    display: none;
+  }
+  .mobile-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .mobile-menu a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4);
+    min-height: 56px;
+    font-size: var(--text-title);
+    line-height: var(--leading-tight);
+    color: var(--color-text-muted);
+  }
+  .mobile-menu a i {
+    display: block;
+    width: var(--pixel-logo);
+    height: var(--pixel-logo);
+    background: var(--color-dot);
+  }
+  .mobile-menu a:hover,
+  .mobile-menu a[aria-current='page'] {
+    color: var(--color-text);
+  }
+  .mobile-menu a[aria-current='page'] i {
+    background: var(--color-accent);
+  }
+  @keyframes menu-in {
+    from { clip-path: inset(0 0 100% 0); }
+    to { clip-path: inset(0 0 0 0); }
+  }
+
+  @media (max-width: 380px) {
+    .site-header {
+      gap: var(--space-2);
+    }
+    .site-header .right {
+      gap: 0;
+    }
+    .site-header :global(.logo) {
+      font-size: 18px;
+      gap: 8px;
+    }
+  }
+  @media (max-width: 640px) {
+    .nav-inline {
+      display: none;
+    }
+    .menu-toggle {
+      display: inline-flex;
+    }
+    .right {
+      gap: var(--space-2);
+    }
+  }
+</style>
+
+<style is:global>
+  /* 메뉴가 열려 있을 때 뒤 페이지 스크롤 잠금 */
+  html[data-menu-open] {
+    overflow: hidden;
+  }
+</style>

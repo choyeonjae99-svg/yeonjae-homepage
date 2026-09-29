@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SynapseCanvas from '../components/SynapseCanvas.astro';
+import { SITE } from '../data/site';
+---
+
+<BaseLayout variant="home">
+  <h1 class="visually-hidden">{SITE.name} — {SITE.tagline}</h1>
+  <SynapseCanvas />
+</BaseLayout>

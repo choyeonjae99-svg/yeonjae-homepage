@@ -1,0 +1,89 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** home: 메인 (전체 화면 그래픽 + 고정 헤더/푸터) / page: 하위 페이지 */
+  variant?: 'home' | 'page';
+}
+
+const { title, description, variant = 'page' } = Astro.props;
+---
+
+<html lang="ko" id="top">
+  <head>
+    <BaseHead title={title} description={description} />
+    <ClientRouter />
+  </head>
+  <body class={variant}>
+    <a class="skip-link" href="#content">본문으로 건너뛰기</a>
+    <Header variant={variant} />
+    <main id="content" class:list={['content', variant]}>
+      <slot />
+    </main>
+    <Footer variant={variant} />
+  </body>
+</html>
+
+<script>
+  // 주인 모드: 어느 페이지든 ?edit 로 한 번 들어오면 이 브라우저에서 [data-owner-only] 가 보인다 (?edit=off 로 끔)
+  const OWNER_KEY = 'yj-owner';
+  function applyOwnerMode() {
+    const params = new URLSearchParams(location.search);
+    try {
+      if (params.has('edit')) {
+        if (params.get('edit') === 'off') localStorage.removeItem(OWNER_KEY);
+        else localStorage.setItem(OWNER_KEY, '1');
+      }
+    } catch {}
+    let owner = import.meta.env.DEV;
+    try {
+      owner ||= localStorage.getItem(OWNER_KEY) === '1';
+    } catch {}
+    document.querySelectorAll<HTMLElement>('[data-owner-only]').forEach((el) => (el.hidden = !owner));
+  }
+  document.addEventListener('astro:page-load', applyOwnerMode);
+</script>
+
+<style>
+  .content.page {
+    /* 좌우 여백(gutter)을 포함한 폭 → 본문 왼쪽 끝이 로고와 맞는다 */
+    max-width: calc(var(--content-max) + var(--gutter) * 2);
+    margin: 0 auto;
+    padding: var(--space-9) var(--gutter) 0;
+  }
+  .content.home {
+    min-height: 100dvh;
+  }
+
+  .skip-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    position: absolute;
+    left: var(--gutter);
+    top: var(--space-2);
+    z-index: 30;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-accent);
+    color: var(--color-text);
+    font-size: var(--text-caption);
+    transform: translateY(-200%);
+  }
+  .skip-link:focus {
+    transform: none;
+  }
+</style>
+
+<style is:global>
+  /* 페이지 전환도 뚝뚝 끊기는 픽셀 느낌으로 */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.24s;
+    animation-timing-function: steps(4);
+  }
+</style>
