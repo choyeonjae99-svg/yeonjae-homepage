@@ -19,6 +19,10 @@ export const env = {
   githubToken: () => read('GITHUB_TOKEN'),
   /** 테스트용: GitHub API 주소 바꾸기 */
   githubApi: () => read('GITHUB_API_URL') ?? 'https://api.github.com',
+  /** 테스트용: 명화 사이트 API 주소 바꾸기 */
+  aicApi: () => read('ART_AIC_URL') ?? 'https://api.artic.edu',
+  aicIiif: () => read('ART_AIC_IIIF_URL') ?? 'https://www.artic.edu/iiif/2',
+  cmaApi: () => read('ART_CMA_URL') ?? 'https://openaccess-api.clevelandart.org',
   /** Upstash Redis (Vercel Marketplace 연동 시 KV_* 이름으로 자동 등록된다) */
   redisUrl: () => read('KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL'),
   redisToken: () => read('KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN'),

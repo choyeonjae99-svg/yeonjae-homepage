@@ -171,6 +171,8 @@ export const GET: APIRoute = safe(async ({ url, cookies }) => {
       // 편집기 안에서는 본문 그림을 GitHub 에서 바로 읽어 보여 주고, 저장할 때 원래 주소로 되돌린다
       body: rich ? rich[1].split(uploadUrl(kind, slug)).join(previewPrefix(kind, slug)) : parts.body,
       previewPrefix: previewPrefix(kind, slug),
+      // 마크다운 본문 미리보기에서 ./그림 경로를 보여 줄 때 앞에 붙인다
+      assetPrefix: preview(`${dir}/`),
       uploadPrefix: uploadUrl(kind, slug),
       uploads,
     });

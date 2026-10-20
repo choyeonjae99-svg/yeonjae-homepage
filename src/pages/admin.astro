@@ -151,6 +151,14 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
                 <label class="check"><input type="checkbox" data-thumb-remove /> 썸네일 빼기</label>
               </div>
               <input id="u-thumb" name="thumb" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+              <div class="thumb-now" data-thumb-picked hidden>
+                <img alt="고른 썸네일" data-picked-img />
+                <div class="picked-info">
+                  <p class="caption" data-picked-credit></p>
+                  <button type="button" class="btn ghost" data-picked-clear>고른 그림 빼기</button>
+                </div>
+              </div>
+              <button type="button" class="btn ghost art-open" data-art-open>명화에서 고르기</button>
               <p class="hint">3:2 비율 권장. 2000px·3MB 이하는 원본 그대로 올려요{editing && ' · 새 파일을 고르면 바뀌어요'}</p>
             </div>
             <div class="field">
@@ -238,11 +246,38 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           </div>
 
           <div class="actions">
+            <button type="button" class="btn ghost" data-preview-open>미리보기</button>
             <button type="submit" class="btn primary" disabled={!hasGithub}>{editing ? '수정 저장' : '올리기'}</button>
             {editing && <button type="button" class="btn ghost danger" data-edit-delete disabled={!hasGithub}>이 글 지우기</button>}
             <p class="status" role="status" aria-live="polite" data-upload-status>{editing ? '불러오는 중…' : ''}</p>
           </div>
         </form>
+
+        <!-- 명화에서 썸네일 고르기 -->
+        <dialog class="dlg art" data-art aria-labelledby="art-title">
+          <div class="dlg-head">
+            <h2 id="art-title" class="h">명화에서 썸네일 고르기</h2>
+            <button type="button" class="btn ghost" data-dialog-close>닫기</button>
+          </div>
+          <form class="art-search" data-art-form>
+            <label for="art-q" class="visually-hidden">검색어</label>
+            <input id="art-q" type="text" maxlength="80" placeholder="영어로: rose, sea, night, cat, Monet…" autocomplete="off" />
+            <button class="btn primary" type="submit">검색</button>
+          </form>
+          <p class="hint">시카고 미술관·클리블랜드 미술관의 저작권이 끝난 작품(퍼블릭 도메인·CC0)만 나와요. 고르면 가운데를 3:2 로 잘라 썸네일로 넣고, 작품 정보는 썸네일 설명에 적어 둬요.</p>
+          <p class="status" role="status" aria-live="polite" data-art-status></p>
+          <ul class="art-grid" data-art-results></ul>
+        </dialog>
+
+        <!-- 미리보기 -->
+        <dialog class="dlg pv" data-preview aria-labelledby="pv-title">
+          <div class="dlg-head">
+            <h2 id="pv-title" class="pixel-label">Preview</h2>
+            <span class="hint">아직 저장 전이에요. 실제 사이트와 같은 글꼴·색으로 보여요.</span>
+            <button type="button" class="btn ghost" data-dialog-close>닫기</button>
+          </div>
+          <div class="pv-body" data-preview-body></div>
+        </dialog>
       </section>
 
       <!-- 방명록 -->
@@ -320,6 +355,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
 <script>
   import { music } from '../scripts/music';
   import { createEditor } from '../scripts/editor';
+  import { markdownToHtml, renderPreview } from '../scripts/preview';
 
   const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = document) => root.querySelector<T>(s);
   const api = async (url: string, init: RequestInit = {}) => {
@@ -486,7 +522,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     type Loaded = {
       title: string; subtitle: string; date: string; period: string; summary: string; tags: string[]; role: string; tools: string[];
       thumbnailAlt: string; thumbnail: { path: string; url: string } | null; images: { path: string; url: string }[];
-      mode: 'rich' | 'markdown'; body: string; previewPrefix: string; uploadPrefix: string; uploads: string[];
+      mode: 'rich' | 'markdown'; body: string; previewPrefix: string; uploadPrefix: string; assetPrefix: string; uploads: string[];
     };
     let loaded: Loaded | null = null;
     const thumbNow = $('[data-thumb-now]', form)!;
@@ -494,6 +530,69 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     const mdBox = $('[data-md-box]', form)!;
     const mdArea = $<HTMLTextAreaElement>('[data-markdown]', form)!;
     const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    // ── 명화에서 고른 썸네일 (파일을 직접 고르면 그쪽이 우선) ──
+    let picked: { file: File; url: string } | null = null;
+    const pickedBox = $('[data-thumb-picked]', form)!;
+    const clearPicked = () => {
+      if (picked) URL.revokeObjectURL(picked.url);
+      picked = null;
+      pickedBox.hidden = true;
+    };
+    const setPicked = (file: File, credit: string) => {
+      clearPicked();
+      picked = { file, url: URL.createObjectURL(file) };
+      $<HTMLImageElement>('[data-picked-img]', pickedBox)!.src = picked.url;
+      $('[data-picked-credit]', pickedBox)!.textContent = credit;
+      pickedBox.hidden = false;
+      field('thumb').value = '';
+      thumbRemove.checked = false;
+    };
+    $('[data-picked-clear]', form)!.addEventListener('click', clearPicked);
+    field('thumb').addEventListener('change', () => field('thumb').files?.length && clearPicked());
+    let autoAlt = ''; // 명화를 고를 때 자동으로 채운 썸네일 설명 (직접 고쳤으면 건드리지 않는다)
+    setupArtPicker((file, info) => {
+      setPicked(file, `${info.title}${info.artist ? ` — ${info.artist}` : ''}${info.date ? `, ${info.date}` : ''} · ${info.museum} (퍼블릭 도메인)`);
+      const alt = field('thumbnailAlt');
+      if (!alt.value.trim() || alt.value === autoAlt) {
+        autoAlt = `${info.title}${info.artist ? `, ${info.artist}` : ''} (${info.museum} 소장, 퍼블릭 도메인)`;
+        alt.value = autoAlt;
+      }
+    });
+
+    // ── 미리보기 ──
+    const pvDialog = $<HTMLDialogElement>('[data-preview]')!;
+    const fileUrls: string[] = [];
+    const urlOf = (f: File) => {
+      const u = URL.createObjectURL(f);
+      fileUrls.push(u);
+      return u;
+    };
+    pvDialog.addEventListener('close', () => fileUrls.splice(0).forEach((u) => URL.revokeObjectURL(u)));
+    $('[data-preview-open]', form)!.addEventListener('click', () => {
+      const fd = new FormData(form);
+      const list = (v: FormDataEntryValue | null) => String(v ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+      const chosen = fd.get('thumb') as File | null;
+      const thumbUrl =
+        chosen && chosen.size ? urlOf(chosen) : picked ? picked.url : editing && loaded?.thumbnail && !thumbRemove.checked ? loaded.thumbnail.url : null;
+      const md = editing && loaded?.mode === 'markdown';
+      renderPreview($('[data-preview-body]')!, {
+        kind: kindOf(),
+        title: String(fd.get('title') ?? '').trim(),
+        subtitle: String(fd.get('subtitle') ?? '').trim(),
+        date: String(fd.get('date') || new Date().toISOString().slice(0, 10)),
+        period: String(fd.get('period') ?? '').trim(),
+        summary: String(fd.get('summary') ?? '').trim(),
+        tags: list(fd.get('tags')),
+        role: String(fd.get('role') ?? '').trim(),
+        tools: list(fd.get('tools')),
+        thumbUrl,
+        thumbAlt: String(fd.get('thumbnailAlt') ?? ''),
+        images: gallery.map((g) => g.url),
+        bodyHtml: md ? markdownToHtml(mdArea.value, loaded?.assetPrefix) : rich.isEmpty() ? '' : `<div class="rich">${rich.editor.getHTML()}</div>`,
+      });
+      pvDialog.showModal();
+    });
     const load = async () => {
       if (!editing) return;
       submitBtn.disabled = true;
@@ -511,6 +610,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         set('tools', d.tools.join(', '));
         set('thumbnailAlt', d.thumbnailAlt);
         field('thumb').value = '';
+        clearPicked();
         thumbRemove.checked = false;
         thumbNow.hidden = !d.thumbnail;
         if (d.thumbnail) $<HTMLImageElement>('[data-thumb-img]', thumbNow)!.src = d.thumbnail.url;
@@ -562,7 +662,8 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         const upload = async (file: File, maxW: number) =>
           api('/api/admin/blob', { method: 'POST', body: JSON.stringify({ data: await shrink(file, maxW) }) }) as Promise<{ sha: string; ext: string }>;
 
-        const thumbFile = (fd.get('thumb') as File | null) ?? null;
+        const chosen = fd.get('thumb') as File | null;
+        const thumbFile = chosen && chosen.size ? chosen : (picked?.file ?? null);
         let thumbnail: { sha: string; ext: string } | null | undefined;
         if (thumbFile && thumbFile.size) {
           status.textContent = '썸네일 올리는 중…';
@@ -633,6 +734,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           form.reset();
           rich.clear();
           gallery = [];
+          clearPicked();
           renderGallery();
           syncKind();
           const edit = Object.assign(document.createElement('a'), { href: `/admin?edit=${kind}/${slug}`, textContent: '다시 고치기' });
@@ -644,6 +746,92 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         submitBtn.disabled = false;
       }
     });
+  }
+
+  /** 명화 검색 창: 고르면 가운데를 3:2 로 잘라(가로 최대 1200px, 늘리지 않음) 파일로 넘긴다 */
+  type ArtInfo = { source: string; id: string; title: string; artist: string; date: string; museum: string; thumb: string; link: string };
+  function setupArtPicker(onPick: (file: File, info: ArtInfo) => void) {
+    const dlg = $<HTMLDialogElement>('[data-art]');
+    const openBtn = $('[data-art-open]');
+    if (!dlg || !openBtn) return;
+    const status = $('[data-art-status]', dlg)!;
+    const grid = $('[data-art-results]', dlg)!;
+    const input = $<HTMLInputElement>('#art-q', dlg)!;
+    openBtn.addEventListener('click', () => {
+      dlg.showModal();
+      input.focus();
+    });
+
+    const crop = async (blob: Blob) => {
+      const bmp = await createImageBitmap(blob);
+      let sw = bmp.width;
+      let sh = Math.round((sw * 2) / 3);
+      if (sh > bmp.height) {
+        sh = bmp.height;
+        sw = Math.round((sh * 3) / 2);
+      }
+      const w = Math.min(1200, sw);
+      const c = Object.assign(document.createElement('canvas'), { width: w, height: Math.round((w * 2) / 3) });
+      const ctx = c.getContext('2d')!;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bmp, Math.round((bmp.width - sw) / 2), Math.round((bmp.height - sh) / 2), sw, sh, 0, 0, c.width, c.height);
+      const out = await new Promise<Blob | null>((ok) => c.toBlob(ok, 'image/webp', 0.92));
+      const fallback = out && out.type === 'image/webp' ? out : await new Promise<Blob | null>((ok) => c.toBlob(ok, 'image/jpeg', 0.92));
+      if (!fallback) throw new Error('그림을 자르지 못했어요.');
+      return new File([fallback], `art-thumb.${fallback.type === 'image/webp' ? 'webp' : 'jpg'}`, { type: fallback.type });
+    };
+
+    const pick = async (a: ArtInfo, btn: HTMLButtonElement) => {
+      btn.disabled = true;
+      status.textContent = `「${a.title}」 가져오는 중…`;
+      try {
+        const res = await fetch('/api/admin/art', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source: a.source, id: a.id }) });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `가져오지 못했어요 (${res.status})`);
+        onPick(await crop(await res.blob()), a);
+        status.textContent = '';
+        dlg.close();
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    $<HTMLFormElement>('[data-art-form]', dlg)!.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      status.textContent = '찾는 중…';
+      grid.replaceChildren();
+      try {
+        const { results } = (await api(`/api/admin/art?q=${encodeURIComponent(q)}`, { method: 'GET' })) as { results: ArtInfo[] };
+        status.textContent = results.length ? `${results.length}개 · 그림을 누르면 썸네일로 넣어요` : '찾은 작품이 없어요. 다른 영어 단어로 찾아 보세요.';
+        grid.replaceChildren(
+          ...results.map((a) => {
+            const li = document.createElement('li');
+            const b = Object.assign(document.createElement('button'), { type: 'button', className: 'art-item' });
+            b.setAttribute('aria-label', `${a.title} 썸네일로 쓰기`);
+            const im = Object.assign(document.createElement('img'), { src: a.thumb, alt: '', loading: 'lazy' });
+            im.addEventListener('error', () => li.remove());
+            const t = Object.assign(document.createElement('span'), { className: 'art-title', textContent: a.title });
+            const m = Object.assign(document.createElement('span'), { className: 'art-meta', textContent: [a.artist, a.date].filter(Boolean).join(', ') });
+            b.append(im, t, m);
+            b.addEventListener('click', () => pick(a, b));
+            const link = Object.assign(document.createElement('a'), { href: a.link, target: '_blank', rel: 'noopener noreferrer', className: 'art-link', textContent: `${a.museum} ↗` });
+            li.append(b, link);
+            return li;
+          }),
+        );
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      }
+    });
+  }
+
+  function setupDialogs() {
+    document.querySelectorAll<HTMLButtonElement>('[data-dialog-close]').forEach((b) =>
+      b.addEventListener('click', () => b.closest('dialog')?.close()),
+    );
   }
 
   function setupGuestbook() {
@@ -851,6 +1039,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
   document.addEventListener('astro:page-load', () => {
     setupLogin();
     setupTabs();
+    setupDialogs();
     setupUpload();
     setupGuestbook();
     setupBeat();
@@ -1251,6 +1440,246 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     pointer-events: none;
   }
 
+  .art-open {
+    justify-self: start;
+  }
+  .picked-info {
+    display: grid;
+    gap: var(--space-2);
+    max-width: 360px;
+  }
+
+  /* 창 (명화 고르기 · 미리보기) */
+  .dlg {
+    width: min(1100px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+  }
+  .dlg::backdrop {
+    background: rgb(28 27 31 / 0.85);
+  }
+  .dlg-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .dlg-head .btn {
+    margin-left: auto;
+  }
+  .art > :not(.dlg-head) {
+    margin: var(--space-4) var(--space-5) 0;
+  }
+  .art-search {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .art-grid {
+    list-style: none;
+    padding: 0 0 var(--space-5);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: var(--space-4);
+  }
+  .art-grid :global(li) {
+    display: grid;
+    align-content: start;
+    gap: var(--space-1);
+  }
+  .art-grid :global(.art-item) {
+    display: grid;
+    gap: var(--space-1);
+    text-align: left;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    padding-bottom: var(--space-2);
+  }
+  .art-grid :global(.art-item:hover),
+  .art-grid :global(.art-item:focus-visible) {
+    border-color: var(--color-accent);
+  }
+  .art-grid :global(.art-item:disabled) {
+    opacity: 0.5;
+  }
+  .art-grid :global(.art-item img) {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    background: var(--color-bg);
+  }
+  .art-grid :global(.art-title) {
+    padding: 0 var(--space-2);
+    font-size: var(--text-caption);
+    color: var(--color-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .art-grid :global(.art-meta) {
+    padding: 0 var(--space-2);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .art-grid :global(.art-link) {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .art-grid :global(.art-link:hover) {
+    color: var(--color-accent-light);
+  }
+
+  /* 미리보기: 실제 페이지와 같은 크기·색 */
+  .pv-body {
+    display: grid;
+    gap: var(--space-8);
+    padding: var(--space-6) var(--space-6) var(--space-8);
+    background-image: radial-gradient(var(--color-grid) 1px, transparent 1.5px);
+    background-size: var(--grid-step) var(--grid-step);
+  }
+  .pv-body :global(.pv-sec) {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .pv-body :global(.pv-cap) {
+    padding-bottom: var(--space-2);
+    border-bottom: 1px dashed var(--color-border);
+  }
+  .pv-body :global(.pv-accent) {
+    color: var(--color-accent-light);
+  }
+  .pv-body :global(.pv-card) {
+    width: min(100%, 360px);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .pv-body :global(.pv-thumb) {
+    position: relative;
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .pv-body :global(.pv-thumb img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pv-body :global(.pv-placeholder) {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--color-dot) 2px, transparent 2.5px);
+    background-size: 16px 16px;
+  }
+  .pv-body :global(.pv-card-body) {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-4) var(--space-5);
+  }
+  .pv-body :global(.pv-meta) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .pv-body :global(.pv-card-title) {
+    display: grid;
+    gap: 2px;
+    line-height: 1.5;
+  }
+  .pv-body :global(.pv-sub) {
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+  .pv-body :global(.pv-page) {
+    display: grid;
+    gap: var(--space-6);
+  }
+  .pv-body :global(.pv-head) {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 48em;
+  }
+  .pv-body :global(.pv-subtitle) {
+    font-size: 18px;
+    color: var(--color-text-muted);
+  }
+  .pv-body :global(.pv-tags) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .pv-body :global(.pv-tags li) {
+    padding: 2px var(--space-2);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .pv-body :global(.pv-layout) {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--space-7);
+    align-items: start;
+  }
+  .pv-body :global(.pv-facts) {
+    display: grid;
+    gap: var(--space-5);
+  }
+  .pv-body :global(.pv-facts dl) {
+    margin: 0;
+    display: grid;
+    gap: var(--space-4);
+  }
+  .pv-body :global(.pv-facts dd) {
+    margin: 2px 0 0;
+    font-size: var(--text-caption);
+  }
+  .pv-body :global(.pv-prose) {
+    max-width: 52em;
+  }
+  .pv-body :global(.pv-cover),
+  .pv-body :global(.pv-figure) {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    border: 1px solid var(--color-border);
+  }
+  .pv-body :global(.pv-gallery) {
+    display: grid;
+    gap: var(--space-4);
+    padding-top: var(--space-6);
+    border-top: 1px dashed var(--color-border);
+  }
+  .pv-body :global(.pv-gallery ol) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+  .pv-body :global(.pv-gallery img) {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--color-border);
+  }
+
   /* 방명록 관리 */
   .gb {
     list-style: none;
@@ -1379,6 +1808,13 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
   }
 
   @media (max-width: 640px) {
+    .pv-body {
+      padding: var(--space-5) var(--space-4) var(--space-7);
+    }
+    .pv-body :global(.pv-layout),
+    .pv-body :global(.pv-gallery ol) {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .grid2,
     .grid3 {
       grid-template-columns: minmax(0, 1fr);
