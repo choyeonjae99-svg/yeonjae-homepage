@@ -15,12 +15,21 @@
   },
   "dependencies": {
     "@astrojs/vercel": "^11.0.11",
+    "@tiptap/core": "^3.32.0",
+    "@tiptap/extension-image": "^3.32.0",
+    "@tiptap/extension-text-align": "^3.32.0",
+    "@tiptap/extension-text-style": "^3.32.0",
+    "@tiptap/extensions": "^3.32.0",
+    "@tiptap/pm": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "@upstash/redis": "^1.39.0",
-    "astro": "^7.3.5"
+    "astro": "^7.3.5",
+    "sanitize-html": "^2.18.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@types/node": "^22.20.4",
+    "@types/sanitize-html": "^2.16.2",
     "typescript": "^6.0.3"
   }
 }

@@ -3,6 +3,7 @@ import type { GetStaticPaths } from 'astro';
 import { Image } from 'astro:assets';
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { IMAGE_QUALITY, widthsFor } from '../../data/images';
 
 export const getStaticPaths = (async () => {
   const entries = (await getCollection('portfolio', ({ data }) => !data.draft)).sort(
@@ -112,9 +113,11 @@ const facts = [
               <Image
                 src={img}
                 alt={`${d.title} ${d.imagesCaption ?? '이미지'} ${i + 1}`}
-                widths={[800, 1600]}
-                sizes="(max-width: 1440px) calc(100vw - 96px), 1344px"
+                widths={widthsFor(img, [800, 1600])}
+                sizes={`(max-width: 640px) min(calc(100vw - 48px), ${img.width}px), min(660px, ${img.width}px)`}
                 format="webp"
+                quality={IMAGE_QUALITY}
+                style={`max-width:${img.width}px`}
               />
             </li>
           ))}
@@ -280,6 +283,7 @@ const facts = [
   }
   .gallery img {
     width: 100%;
+    margin: 0 auto;
     height: auto;
     border: 1px solid var(--color-border);
   }

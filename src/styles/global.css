@@ -193,6 +193,87 @@ a {
   border-top: 1px dashed var(--color-border);
 }
 
+/* ── 편집기로 쓴 본문 (.rich) ──────────────
+ * 주인이 정한 서식(굵기·색·크기·정렬)은 글 안의 인라인 스타일이 그대로 이긴다.
+ * 본문에서만 굵게(600)를 허용한다 (사이트 나머지는 400).
+ */
+.rich {
+  display: grid;
+  gap: var(--space-4);
+}
+.rich p,
+.rich li {
+  color: var(--color-text);
+}
+.rich p:empty::after {
+  content: '\00a0'; /* 빈 줄도 한 줄 높이를 차지하게 */
+}
+.rich strong,
+.rich b {
+  font-weight: 600;
+}
+.rich em,
+.rich i {
+  font-style: italic;
+}
+.rich u {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rich s,
+.rich del {
+  text-decoration: line-through;
+}
+.rich a {
+  color: var(--color-accent-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rich h2,
+.rich h3 {
+  display: block; /* 정렬(text-align)이 먹도록 */
+  margin-top: var(--space-5);
+}
+.rich h2::before {
+  display: inline-block;
+  margin-right: var(--space-3);
+  vertical-align: middle;
+}
+.rich hr {
+  width: 100%;
+  height: 2px;
+  margin: var(--space-5) 0;
+  border: 0;
+  background: repeating-linear-gradient(90deg, var(--color-dot) 0 2px, transparent 2px 8px);
+}
+/* 그림: 원본 크기보다 절대 크게 늘리지 않는다. 크기 선택은 화면 폭 대비 비율 */
+.rich img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin: var(--space-2) auto;
+  border: 1px solid var(--color-border);
+}
+.rich img[data-size='small'] {
+  width: 40%;
+}
+.rich img[data-size='medium'] {
+  width: 70%;
+}
+.rich img[data-size='full'] {
+  width: 100%;
+}
+/* 저장된 그림에는 style="max-width:원본px" 가 붙어 있어 위 비율이어도 원본보다 커지지 않는다 */
+@media (max-width: 640px) {
+  .rich img[data-size='small'] {
+    width: 70%;
+  }
+  .rich img[data-size='medium'] {
+    width: 100%;
+  }
+}
+
 /* ── 포커스 (키보드 접근성): 픽셀 느낌의 네모 테두리 ── */
 :focus-visible {
   outline: 2px solid var(--color-accent);
