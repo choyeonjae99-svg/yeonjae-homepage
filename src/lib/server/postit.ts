@@ -17,7 +17,7 @@ export interface Note {
 
 const H = 'pi:notes';
 const Z = 'pi:index';
-export const MAX_TEXT = 500;
+export const MAX_TEXT = 1000;
 export const MAX_NOTES = 200;
 
 export function validate(body: Record<string, unknown>) {

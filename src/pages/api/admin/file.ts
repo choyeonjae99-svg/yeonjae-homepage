@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   if (!githubConfigured()) return new Response('not configured', { status: 503 });
   const p = url.searchParams.get('p') ?? '';
   const ext = p.split('.').pop()?.toLowerCase() ?? '';
-  const okDir = /^(src\/content\/(portfolio|works)\/|public\/uploads\/)/.test(p);
+  const okDir = /^(src\/content\/(portfolio|works|about)\/|public\/uploads\/)/.test(p);
   if (!okDir || !TYPES[ext] || !/^[\w.\-/]+$/.test(p) || p.split('/').includes('..')) return new Response('bad path', { status: 400 });
   try {
     const buf = await getRaw(p);
