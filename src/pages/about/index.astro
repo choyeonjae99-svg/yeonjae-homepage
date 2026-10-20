@@ -23,10 +23,16 @@ const sections = [
   { id: 'education', en: 'Education', ko: '학력', rows: cv.education },
   { id: 'projects', en: 'R&D Projects', ko: '참여 연구 과제', rows: cv.projects },
   { id: 'awards', en: 'Awards', ko: '수상', rows: cv.awards },
-];
+].filter((s) => s.rows.length > 0); // 비어 있는 칸은 숨긴다
 ---
 
 <BaseLayout title="소개" description={`${p.name} — ${p.headline}`}>
+  <!-- 주인 전용: /admin 에서 로그인한 브라우저에서만 보인다 -->
+  <div class="owner-bar" data-owner-only hidden>
+    <span class="pixel-label">Owner</span>
+    <a class="owner-btn" href="/admin#about">소개 수정</a>
+  </div>
+
   <section class="hero" aria-labelledby="about-title">
     <figure class="photo">
       <Image
@@ -81,6 +87,7 @@ const sections = [
     </section>
   ))}
 
+  {papers.length > 0 && (
   <section class="block" aria-labelledby="papers">
     <h2 class="block-head" id="papers">
       <span class="pixel-label">Papers</span>
@@ -137,7 +144,9 @@ const sections = [
       ))}
     </ol>
   </section>
+  )}
 
+  {cv.skills.length > 0 && (
   <section class="block" aria-labelledby="skills">
     <h2 class="block-head" id="skills">
       <span class="pixel-label">Skills</span>
@@ -154,9 +163,35 @@ const sections = [
       ))}
     </ul>
   </section>
+  )}
 </BaseLayout>
 
 <style>
+  .owner-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-surface);
+    border: 1px dashed var(--color-accent);
+  }
+  .owner-bar .pixel-label {
+    color: var(--color-accent-light);
+  }
+  .owner-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-menu);
+    color: var(--color-text);
+  }
+  .owner-btn:hover {
+    border-color: var(--color-accent);
+  }
   /* ── 자기소개 ─────────────────────────── */
   .hero {
     display: grid;

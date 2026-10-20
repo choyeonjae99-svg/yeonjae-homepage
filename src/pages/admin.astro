@@ -71,6 +71,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           <button type="button" role="tab" id="t-guestbook" aria-controls="p-guestbook" aria-selected="false" tabindex="-1" data-tab="guestbook">방명록</button>
           <button type="button" role="tab" id="t-beat" aria-controls="p-beat" aria-selected="false" tabindex="-1" data-tab="beat">박자 맞추기</button>
           <button type="button" role="tab" id="t-posts" aria-controls="p-posts" aria-selected="false" tabindex="-1" data-tab="posts">올린 글</button>
+          <button type="button" role="tab" id="t-about" aria-controls="p-about" aria-selected="false" tabindex="-1" data-tab="about">소개 수정</button>
         </div>
         <button type="button" class="btn ghost" data-logout>로그아웃</button>
       </div>
@@ -340,6 +341,74 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           </div>
           <p class="hint">지금 저장된 값: {MUSIC.bpm} BPM · 첫 박 {MUSIC.offset}초 · {MUSIC.beatsPerBar}박자</p>
         </div>
+      </section>
+
+      <!-- 소개 수정 -->
+      <section role="tabpanel" id="p-about" aria-labelledby="t-about" data-panel="about" hidden>
+        <form class="about-form" data-about novalidate>
+          <p class="caption" data-about-info>불러오는 중…</p>
+
+          <fieldset class="abox">
+            <legend class="h">프로필</legend>
+            <div class="grid2">
+              <div class="field">
+                <label for="ab-name">이름 *</label>
+                <input id="ab-name" name="name" type="text" maxlength="40" />
+              </div>
+              <div class="field">
+                <label for="ab-nameEn">영문 이름 *</label>
+                <input id="ab-nameEn" name="nameEn" type="text" maxlength="60" />
+              </div>
+              <div class="field span2">
+                <label for="ab-headline">한 줄 소개 *</label>
+                <input id="ab-headline" name="headline" type="text" maxlength="160" />
+              </div>
+              <div class="field span2">
+                <label for="ab-body">소개글</label>
+                <textarea id="ab-body" name="body" rows="7" maxlength="6000"></textarea>
+                <p class="hint">빈 줄을 하나 넣으면 문단이 나뉘어요. <code>**굵게**</code> 처럼 쓰면 강조돼요.</p>
+              </div>
+              <div class="field">
+                <label for="ab-interests">관심 분야</label>
+                <input id="ab-interests" name="interests" type="text" placeholder="쉼표로 구분: 게임 연구, 사용자 연구" />
+              </div>
+              <div class="field">
+                <label for="ab-email">이메일 *</label>
+                <input id="ab-email" name="email" type="text" maxlength="120" autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="ab-photo">프로필 사진</label>
+                <img class="ab-photo" alt="지금 프로필 사진" data-ab-photo hidden />
+                <input id="ab-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" />
+                <p class="hint">새 파일을 고르면 바뀌어요. 정사각형 800px 이상 권장</p>
+              </div>
+              <div class="field">
+                <label for="ab-photoAlt">사진 설명</label>
+                <input id="ab-photoAlt" name="photoAlt" type="text" maxlength="200" placeholder="화면 낭독기용 한 문장" />
+              </div>
+            </div>
+          </fieldset>
+
+          {[
+            ['education', '학력', '+ 학력 추가'],
+            ['projects', '참여 연구 과제', '+ 연구 과제 추가'],
+            ['awards', '수상', '+ 수상 추가'],
+            ['skills', '역량', '+ 역량 추가'],
+            ['papers', '논문', '+ 논문 추가'],
+          ].map(([key, label, add]) => (
+            <fieldset class="abox" data-ab-list={key}>
+              <legend class="h">{label}</legend>
+              <ol class="ab-rows" data-rows></ol>
+              <button type="button" class="btn ghost" data-add>{add}</button>
+            </fieldset>
+          ))}
+
+          <div class="actions sticky-save">
+            <button type="submit" class="btn primary" disabled={!hasGithub}>소개 저장</button>
+            <a class="btn ghost" href="/about" target="_blank" rel="noopener">소개 페이지 보기 ↗</a>
+            <p class="status" role="status" aria-live="polite" data-about-status></p>
+          </div>
+        </form>
       </section>
 
       <!-- 올린 글 -->
@@ -1041,6 +1110,229 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     });
   }
 
+  /** 소개 수정: 프로필 · 이력(학력/연구 과제/수상/역량) · 논문 */
+  type AbField = { key: string; label: string; type?: 'text' | 'textarea' | 'select' | 'number'; options?: [string, string][]; wide?: boolean; placeholder?: string; hint?: string };
+  let abUid = 0;
+  function rowList(box: HTMLElement, fields: AbField[], blank: () => Record<string, string>, unit: string) {
+    let rows: Record<string, string>[] = [];
+    const ol = $('[data-rows]', box)!;
+    const render = () => {
+      ol.replaceChildren(
+        ...rows.map((r, i) => {
+          const li = document.createElement('li');
+          li.className = 'ab-row';
+          const grid = document.createElement('div');
+          grid.className = 'ab-grid';
+          for (const f of fields) {
+            const id = `ab-${f.key}-${++abUid}`;
+            const wrap = document.createElement('div');
+            wrap.className = `field${f.wide ? ' span2' : ''}`;
+            const label = Object.assign(document.createElement('label'), { htmlFor: id, textContent: f.label });
+            let input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+            if (f.type === 'textarea') input = Object.assign(document.createElement('textarea'), { rows: 3 });
+            else if (f.type === 'select') {
+              input = document.createElement('select');
+              f.options!.forEach(([v, t]) => (input as HTMLSelectElement).append(new Option(t, v)));
+            } else input = Object.assign(document.createElement('input'), { type: f.type === 'number' ? 'number' : 'text' });
+            input.id = id;
+            if (f.placeholder && 'placeholder' in input) input.placeholder = f.placeholder;
+            input.value = r[f.key] ?? '';
+            input.addEventListener('input', () => (r[f.key] = input.value));
+            wrap.append(label, input);
+            if (f.hint) wrap.append(Object.assign(document.createElement('p'), { className: 'hint', textContent: f.hint }));
+            grid.append(wrap);
+          }
+          const tools = document.createElement('div');
+          tools.className = 'ab-tools';
+          const mk = (text: string, aria: string, fn: () => void, disabled = false) => {
+            const b = Object.assign(document.createElement('button'), { type: 'button', className: 'btn ghost', textContent: text, disabled });
+            b.setAttribute('aria-label', `${unit} ${i + 1}번째 ${aria}`);
+            b.addEventListener('click', () => {
+              fn();
+              render();
+            });
+            return b;
+          };
+          const swap = (j: number) => ([rows[i], rows[j]] = [rows[j], rows[i]]);
+          tools.append(
+            Object.assign(document.createElement('span'), { className: 'pixel-label', textContent: String(i + 1).padStart(2, '0') }),
+            mk('↑', '위로', () => swap(i - 1), i === 0),
+            mk('↓', '아래로', () => swap(i + 1), i === rows.length - 1),
+            mk('삭제', '삭제', () => rows.splice(i, 1)),
+          );
+          li.append(tools, grid);
+          return li;
+        }),
+      );
+    };
+    $('[data-add]', box)!.addEventListener('click', () => {
+      rows.push(blank());
+      render();
+      (ol.lastElementChild?.querySelector('input, textarea, select') as HTMLElement | null)?.focus();
+    });
+    return {
+      set(next: Record<string, string>[]) {
+        rows = next;
+        render();
+      },
+      get: () => rows,
+    };
+  }
+
+  function setupAbout() {
+    const form = $<HTMLFormElement>('[data-about]');
+    if (!form) return;
+    const info = $('[data-about-info]', form)!;
+    const status = $('[data-about-status]', form)!;
+    const photoImg = $<HTMLImageElement>('[data-ab-photo]', form)!;
+    const el = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+    const box = (k: string) => $(`[data-ab-list="${k}"]`, form)!;
+    const cvFields: AbField[] = [
+      { key: 'period', label: '기간', placeholder: '예: 2024 – 2026' },
+      { key: 'title', label: '내용 *', wide: true },
+      { key: 'note', label: '설명 (선택)', type: 'textarea', wide: true },
+    ];
+    const blankCv = () => ({ period: '', title: '', note: '' });
+    const lists = {
+      education: rowList(box('education'), cvFields, blankCv, '학력'),
+      projects: rowList(box('projects'), cvFields, blankCv, '연구 과제'),
+      awards: rowList(box('awards'), cvFields, blankCv, '수상'),
+      skills: rowList(
+        box('skills'),
+        [
+          { key: 'title', label: '역량 *', wide: true },
+          { key: 'note', label: '설명', type: 'textarea', wide: true },
+        ],
+        () => ({ title: '', note: '' }),
+        '역량',
+      ),
+      papers: rowList(
+        box('papers'),
+        [
+          { key: 'type', label: '종류', type: 'select', options: [['thesis', '학위논문'], ['journal', '학술지'], ['conference', '학술대회']] },
+          { key: 'year', label: '연도 *', type: 'number', placeholder: '2026' },
+          { key: 'month', label: '월 (선택)', type: 'number', placeholder: '1–12' },
+          { key: 'volume', label: '권·호 (선택)', placeholder: '예: 제26권 제5호' },
+          { key: 'title', label: '제목 *', wide: true },
+          { key: 'subtitle', label: '부제 (선택)', wide: true },
+          { key: 'titleEn', label: '영문 제목 (선택)', wide: true },
+          { key: 'authors', label: '저자 *', placeholder: '쉼표로 구분: 조연재, 홍길동', wide: true },
+          { key: 'venue', label: '학회지·학교 *', wide: true },
+          { key: 'summary', label: '요약', type: 'textarea', wide: true },
+          { key: 'keywords', label: '키워드', placeholder: '쉼표로 구분', wide: true },
+          { key: 'note', label: '수상 등 메모 (선택)', wide: true },
+          { key: 'links', label: '원문 링크', type: 'textarea', wide: true, hint: '한 줄에 하나씩 "이름 | https://주소" (예: DBpia | https://www.dbpia.co.kr/...)' },
+        ],
+        () => ({ id: '', type: 'journal', year: String(new Date().getFullYear()), month: '', volume: '', title: '', subtitle: '', titleEn: '', authors: '', venue: '', summary: '', keywords: '', note: '', links: '' }),
+        '논문',
+      ),
+    };
+
+    type Paper = Record<string, any>;
+    const load = async () => {
+      info.textContent = '불러오는 중…';
+      try {
+        const d = await api('/api/admin/about', { method: 'GET' });
+        const p = d.profile;
+        el('name').value = p.name;
+        el('nameEn').value = p.nameEn;
+        el('headline').value = p.headline;
+        el('body').value = p.body === '[여기에 소개글]' ? '' : p.body;
+        el('interests').value = p.interests.join(', ');
+        el('email').value = p.email;
+        el('photoAlt').value = p.photoAlt;
+        el('photo').value = '';
+        photoImg.hidden = !p.photoUrl;
+        if (p.photoUrl) photoImg.src = p.photoUrl;
+        const rowsOf = (v: unknown) => (Array.isArray(v) ? v : []).map((r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).map(([k, x]) => [k, String(x ?? '')])));
+        lists.education.set(rowsOf(d.cv.education));
+        lists.projects.set(rowsOf(d.cv.projects));
+        lists.awards.set(rowsOf(d.cv.awards));
+        lists.skills.set(rowsOf(d.cv.skills));
+        lists.papers.set(
+          (d.papers as Paper[]).map((x) => ({
+            id: x.id ?? '',
+            type: x.type ?? 'journal',
+            year: String(x.year ?? ''),
+            month: x.month ? String(x.month) : '',
+            volume: x.volume ?? '',
+            title: x.title ?? '',
+            subtitle: x.subtitle ?? '',
+            titleEn: x.titleEn ?? '',
+            authors: (x.authors ?? []).join(', '),
+            venue: x.venue ?? '',
+            summary: x.summary ?? '',
+            keywords: (x.keywords ?? []).join(', '),
+            note: x.note ?? '',
+            links: (x.links ?? []).map((l: { label: string; href: string }) => `${l.label} | ${l.href}`).join('\n'),
+          })),
+        );
+        info.textContent = '고친 뒤 맨 아래 「소개 저장」을 누르면 1–2분 뒤 소개 페이지에 반영돼요.';
+      } catch (err) {
+        info.textContent = (err as Error).message;
+      }
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      btn.disabled = true;
+      try {
+        let photo: { sha: string; ext: string } | undefined;
+        const file = el('photo').files?.[0];
+        if (file) {
+          status.textContent = '사진 올리는 중…';
+          photo = (await api('/api/admin/blob', { method: 'POST', body: JSON.stringify({ data: await shrink(file, 1600) }) })) as { sha: string; ext: string };
+        }
+        status.textContent = '저장하는 중…';
+        const papers = lists.papers.get().map((x) => ({
+          ...x,
+          links: String(x.links ?? '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+              const [label, ...rest] = line.split('|');
+              return { label: label.trim(), href: rest.join('|').trim() };
+            }),
+        }));
+        await api('/api/admin/about', {
+          method: 'PUT',
+          body: JSON.stringify({
+            profile: {
+              name: el('name').value,
+              nameEn: el('nameEn').value,
+              headline: el('headline').value,
+              body: el('body').value,
+              interests: el('interests').value,
+              email: el('email').value,
+              photoAlt: el('photoAlt').value,
+              photo,
+            },
+            cv: { education: lists.education.get(), projects: lists.projects.get(), awards: lists.awards.get(), skills: lists.skills.get() },
+            papers,
+          }),
+        });
+        status.replaceChildren('저장했어요! 1–2분 뒤 반영돼요 → ', Object.assign(document.createElement('a'), { href: '/about', textContent: '/about' }));
+        await load();
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    let loaded = false;
+    const onTab = (id: string) => {
+      if (id === 'about' && !loaded) {
+        loaded = true;
+        void load();
+      }
+    };
+    document.addEventListener('admin:tab', (e) => onTab((e as CustomEvent).detail));
+    if (location.hash === '#about') onTab('about');
+  }
+
   function setupPosts() {
     const status = $('[data-posts-status]');
     if (!status) return;
@@ -1069,6 +1361,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     setupGuestbook();
     setupBeat();
     setupPosts();
+    setupAbout();
   });
 </script>
 
@@ -1828,6 +2121,76 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     padding: 0 var(--space-3);
   }
 
+  /* 소개 수정 */
+  .about-form {
+    display: grid;
+    gap: var(--space-6);
+    max-width: 880px;
+  }
+  .abox {
+    display: grid;
+    gap: var(--space-4);
+    margin: 0;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .abox legend {
+    padding: 0 var(--space-2);
+  }
+  .abox > .btn {
+    justify-self: start;
+  }
+  .ab-photo {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+  }
+  .ab-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-4);
+  }
+  .ab-rows :global(.ab-row) {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-bg);
+    border: 1px dashed var(--color-border);
+  }
+  .ab-rows :global(.ab-grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-4);
+  }
+  .ab-rows :global(.ab-tools) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .ab-rows :global(.ab-tools .pixel-label) {
+    margin-right: auto;
+    color: var(--color-accent-light);
+  }
+  .ab-rows :global(.ab-tools .btn) {
+    padding: 0 var(--space-3);
+  }
+  .ab-rows :global(.field.span2) {
+    grid-column: 1 / -1;
+  }
+  .sticky-save {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    padding: var(--space-3) 0;
+    background: var(--color-bg);
+    border-top: 1px dashed var(--color-border);
+  }
+
   /* 올린 글 */
   .posts {
     list-style: none;
@@ -1857,6 +2220,9 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
   @media (max-width: 640px) {
     .pv-body {
       padding: var(--space-5) var(--space-4) var(--space-7);
+    }
+    .ab-rows :global(.ab-grid) {
+      grid-template-columns: minmax(0, 1fr);
     }
     .pv-body :global(.pv-layout),
     .pv-body :global(.pv-gallery ol) {

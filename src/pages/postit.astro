@@ -28,7 +28,7 @@ const COLORS = [
         <span class="pin" aria-hidden="true"></span>
         <form class="editor" data-pi-form>
           <label class="visually-hidden" for="pi-text">새 메모</label>
-          <textarea id="pi-text" name="text" rows="6" maxlength="500" placeholder="새 메모를 적어요"></textarea>
+          <textarea id="pi-text" name="text" rows="6" maxlength="1000" placeholder="새 메모를 적어요"></textarea>
           <fieldset class="colors">
             <legend class="visually-hidden">메모 색</legend>
             {COLORS.map((c, i) => (
@@ -39,7 +39,7 @@ const COLORS = [
             ))}
           </fieldset>
           <div class="row">
-            <span class="count pixel-label" data-pi-count>0/500</span>
+            <span class="count pixel-label" data-pi-count>0/1000</span>
             <button type="submit" class="act">붙이기</button>
           </div>
         </form>
@@ -77,6 +77,8 @@ const COLORS = [
     for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0;
     return [-2, -1, 1, 2, -1.5, 1.5][Math.abs(h) % 6];
   };
+  // 글이 길면 포스트잇을 넓게 (높이는 글에 맞춰 저절로 늘어난다)
+  const sizeOf = (t: string) => (t.length > 500 ? 'xl' : t.length > 200 ? 'wide' : 'normal');
   const api = async (url: string, init: RequestInit = {}) => {
     const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
     const data = await res.json().catch(() => ({}));
@@ -118,6 +120,7 @@ const COLORS = [
       li.dataset.id = n.id;
       li.style.setProperty('--tilt', `${tilt(n.id)}deg`);
       li.querySelector('.text')!.textContent = n.text;
+      li.dataset.size = sizeOf(n.text);
       const time = li.querySelector('time')!;
       time.dateTime = new Date(n.createdAt).toISOString();
       time.textContent = fmt(n.createdAt);
@@ -144,7 +147,7 @@ const COLORS = [
     const edit = (li: HTMLLIElement, n: Note) => {
       const f = document.createElement('form');
       f.className = 'editor';
-      const ta = Object.assign(document.createElement('textarea'), { value: n.text, rows: 6, maxLength: 500 });
+      const ta = Object.assign(document.createElement('textarea'), { value: n.text, rows: 8, maxLength: 1000 });
       ta.setAttribute('aria-label', '메모 고치기');
       const row = document.createElement('div');
       row.className = 'row';
@@ -172,6 +175,7 @@ const COLORS = [
           const { note } = await api('/api/postit', { method: 'PATCH', body: JSON.stringify({ id: n.id, text: ta.value, color }) });
           Object.assign(n, note);
           li.querySelector('.text')!.textContent = n.text;
+          li.dataset.size = sizeOf(n.text);
           close();
           status.textContent = '메모를 고쳤어요.';
         } catch (err) {
@@ -195,7 +199,7 @@ const COLORS = [
 
     const text = form.querySelector('textarea')!;
     const count = form.querySelector('[data-pi-count]')!;
-    text.addEventListener('input', () => (count.textContent = `${text.value.length}/500`));
+    text.addEventListener('input', () => (count.textContent = `${text.value.length}/1000`));
     form.addEventListener('change', (e) => {
       const t = e.target as HTMLInputElement;
       if (t.name === 'color') newCard.dataset.color = t.value;
@@ -211,7 +215,7 @@ const COLORS = [
         notes.unshift(note);
         newCard.after(card(note));
         text.value = '';
-        count.textContent = '0/500';
+        count.textContent = '0/1000';
         status.textContent = '메모를 붙였어요.';
         showEmpty();
       } catch (err) {
@@ -256,8 +260,21 @@ const COLORS = [
     padding: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-auto-flow: row dense;
     gap: var(--space-7) var(--space-6);
     align-items: start;
+  }
+  /* 긴 메모는 넓게: 200자 넘으면 두 칸, 500자 넘으면 한 줄 전체 (화면이 좁으면 둘 다 한 줄 전체) */
+  .note[data-size='wide'] {
+    grid-column: span 2;
+  }
+  .note[data-size='xl'] {
+    grid-column: 1 / -1;
+  }
+  /* 큰 메모는 덜 기울인다 */
+  .note[data-size='wide'],
+  .note[data-size='xl'] {
+    transform: rotate(calc(var(--tilt, 0deg) * 0.3));
   }
 
   /* 메모 한 장 */
@@ -268,6 +285,7 @@ const COLORS = [
     position: relative;
     display: grid;
     gap: var(--space-3);
+    min-width: 0; /* 긴 글자가 칸을 밀어내지 않게 */
     min-height: 200px;
     padding: var(--space-6) var(--space-4) var(--space-4);
     background: var(--paper);
@@ -318,6 +336,9 @@ const COLORS = [
   .text {
     margin: 0;
     white-space: pre-wrap;
+    /* 띄어쓰기 없는 긴 주소·영문도 메모 안에서 줄바꿈 */
+    overflow-wrap: anywhere;
+    word-break: normal;
     font-size: 15px;
     line-height: 1.7;
     color: var(--ink);
@@ -449,7 +470,9 @@ const COLORS = [
       min-height: 150px;
       padding: var(--space-5) var(--space-3) var(--space-3);
     }
-    .note.new {
+    .note.new,
+    .note[data-size='wide'],
+    .note[data-size='xl'] {
       grid-column: 1 / -1;
     }
   }

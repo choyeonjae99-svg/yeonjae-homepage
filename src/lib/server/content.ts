@@ -124,7 +124,7 @@ export function rewriteMarkdown(fm: string, changes: Record<string, unknown>, bo
     else {
       const node = doc.createNode(v);
       // 짧은 글자 목록(태그·도구)은 한 줄로
-      if (Array.isArray(v) && (k === 'tags' || k === 'tools' || k === 'imageSizes')) (node as { flow?: boolean }).flow = true;
+      if (Array.isArray(v) && (k === 'tags' || k === 'tools' || k === 'imageSizes' || k === 'interests' || k === 'keywords')) (node as { flow?: boolean }).flow = true;
       doc.set(k, node);
     }
   }
