@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { isAdmin, json, sameOrigin } from '../../../lib/server/session';
 import { commitFiles, githubConfigured, listTree, type TreeItem } from '../../../lib/server/github';
-import { IMAGE_EXT, KINDS, buildMarkdown, isKind, isSlug, slugify, type ImageExt } from '../../../lib/server/content';
+import { IMAGE_EXT, KINDS, buildMarkdown, isKind, isSlug, slugify, uploadDir, uploadUrl, type ImageExt } from '../../../lib/server/content';
+import { sanitizeBody } from '../../../lib/server/sanitize';
 
 export const prerender = false;
 
@@ -31,6 +32,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const images = (Array.isArray(b.images) ? b.images : []) as { sha?: unknown; ext?: unknown }[];
   if (thumb && (!isSha(thumb.sha) || !isExt(thumb.ext))) return json({ error: '썸네일 정보가 잘못됐어요.' }, 400);
   if (images.some((i) => !isSha(i.sha) || !isExt(i.ext)) || images.length > 30) return json({ error: '이미지 정보가 잘못됐어요.' }, 400);
+  const bodyImages = (Array.isArray(b.bodyImages) ? b.bodyImages : []) as { name?: unknown; sha?: unknown }[];
+  if (bodyImages.length > 60 || bodyImages.some((i) => !isSha(i.sha) || typeof i.name !== 'string' || !/^b\d{2,3}\.(jpg|jpeg|png|webp|gif)$/.test(i.name))) {
+    return json({ error: '본문 그림 정보가 잘못됐어요.' }, 400);
+  }
+  const bodyHtml =
+    typeof b.bodyHtml === 'string' && b.bodyHtml.trim()
+      ? sanitizeBody(b.bodyHtml.slice(0, 300_000), uploadUrl(b.kind, slug), new Set(bodyImages.map((i) => i.name as string)))
+      : '';
 
   const dir = KINDS[b.kind].dir;
   try {
@@ -52,6 +61,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       tools: list(b.tools),
       thumbnailAlt: str(b.thumbnailAlt, 200) || undefined,
       body: str(b.body, 50_000),
+      bodyHtml: bodyHtml || undefined,
       thumbExt: thumb ? (thumb.ext as ImageExt) : undefined,
       imageExts: images.map((i) => i.ext as ImageExt),
     });
@@ -61,6 +71,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     images.forEach((img, i) =>
       items.push({ path: `${dir}/${slug}/${String(i + 1).padStart(2, '0')}.${img.ext}`, sha: img.sha as string }),
     );
+    bodyImages.forEach((img) => items.push({ path: `${uploadDir(b.kind as string, slug)}/${img.name}`, sha: img.sha as string }));
     const sha = await commitFiles(items, `Add ${b.kind}: ${title}`);
     const base = KINDS[b.kind].collection === 'portfolio' ? '/portfolio' : '/works';
     return json({ ok: true, commit: sha, url: `${base}/${slug}` }, 201);
@@ -80,6 +91,7 @@ export const DELETE: APIRoute = async ({ request, cookies }) => {
   try {
     const paths = (await listTree(`${dir}/${slug}`)).filter((p) => p === `${dir}/${slug}.md` || p.startsWith(`${dir}/${slug}/`));
     if (!paths.some((p) => p.endsWith('.md'))) return json({ error: '글을 찾을 수 없어요.' }, 404);
+    paths.push(...(await listTree(`${uploadDir(b.kind, slug)}/`))); // 본문 그림도 함께
     const sha = await commitFiles(paths.map((path) => ({ path, delete: true as const })), `Remove ${b.kind}: ${slug}`);
     return json({ ok: true, commit: sha });
   } catch (e) {

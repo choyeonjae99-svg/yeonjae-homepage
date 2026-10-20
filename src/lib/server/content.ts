@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
 
+/** 본문 그림이 저장되는 공개 폴더 (그대로 서빙되어 다시 압축되지 않는다) */
+export const uploadDir = (kind: string, slug: string) => `public/uploads/${kind}/${slug}`;
+export const uploadUrl = (kind: string, slug: string) => `/uploads/${kind}/${slug}/`;
+
 /** 업로드 종류 → 저장 폴더 */
 export const KINDS = {
   research: { dir: 'src/content/portfolio/research', collection: 'portfolio', label: '연구 포트폴리오' },
@@ -51,6 +55,8 @@ export interface Post {
   tools: string[];
   thumbnailAlt?: string;
   body: string;
+  /** 편집기로 쓴 본문 (정리된 HTML). 있으면 body 대신 쓴다 */
+  bodyHtml?: string;
   thumbExt?: ImageExt;
   imageExts: ImageExt[];
 }
@@ -74,6 +80,8 @@ export function buildMarkdown(p: Post) {
     p.imageExts.forEach((ext, i) => lines.push(`  - ${y(`./${p.slug}/${String(i + 1).padStart(2, '0')}.${ext}`)}`));
     if (isPortfolio) lines.push(`imagesCaption: ${y('이미지')}`);
   }
-  lines.push('---', '', p.body.trim(), '');
+  // 편집기 본문은 한 줄짜리 <div class="rich"> 로 넣어 마크다운이 건드리지 않게 한다
+  const body = p.bodyHtml ? `<div class="rich">${p.bodyHtml}</div>` : p.body.trim();
+  lines.push('---', '', body, '');
   return lines.join('\n');
 }

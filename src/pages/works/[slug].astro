@@ -4,6 +4,7 @@ import { Image } from 'astro:assets';
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { formatDate } from '../../data/format';
+import { IMAGE_QUALITY, widthsFor } from '../../data/images';
 
 export const getStaticPaths = (async () => {
   const entries = (await getCollection('works', ({ data }) => !data.draft)).sort(
@@ -54,7 +55,15 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
 
     {!isDrawing && d.thumbnail && (
       <figure class="cover">
-        <Image src={d.thumbnail} alt={d.thumbnailAlt} widths={[800, 1600]} sizes="(max-width: 900px) 100vw, 860px" format="webp" />
+        <Image
+          src={d.thumbnail}
+          alt={d.thumbnailAlt}
+          widths={widthsFor(d.thumbnail, [800, 1600])}
+          sizes={`(max-width: 900px) 100vw, ${Math.min(860, d.thumbnail.width)}px`}
+          format="webp"
+          quality={IMAGE_QUALITY}
+          style={`max-width:${d.thumbnail.width}px`}
+        />
       </figure>
     )}
 
@@ -65,9 +74,11 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
             <Image
               src={img}
               alt={i === 0 && d.thumbnailAlt ? d.thumbnailAlt : `${d.title} ${i + 1}`}
-              widths={[800, 1600, 2000]}
-              sizes="(max-width: 1440px) calc(100vw - 96px), 1344px"
+              widths={widthsFor(img, [800, 1600, 2000])}
+              sizes={`(max-width: 1440px) min(calc(100vw - 96px), ${img.width}px), ${Math.min(1344, img.width)}px`}
               format="webp"
+              quality={IMAGE_QUALITY}
+              style={`max-width:${img.width}px`}
             />
           </figure>
         ))}
@@ -153,9 +164,11 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
   figure {
     margin: 0;
   }
+  /* 원본보다 크게 늘리지 않고 가운데에 (max-width 는 각 그림의 원본 가로) */
   figure img {
     width: 100%;
     height: auto;
+    margin: 0 auto;
     border: 1px solid var(--color-border);
   }
   .figures {
