@@ -36,9 +36,16 @@ const { kind, slug, title, back } = Astro.props;
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ kind: b.dataset.kind, slug: b.dataset.slug }),
         });
-        const data = await res.json().catch(() => ({}));
+        const text = await res.text();
+        let data: { error?: string } = {};
+        try {
+          data = JSON.parse(text);
+        } catch {}
         if (res.status === 403) throw new Error('로그인이 끝났어요. /admin 에서 다시 로그인해 주세요.');
-        if (!res.ok) throw new Error(data.error || `지우지 못했어요 (${res.status})`);
+        if (!res.ok) {
+          const snippet = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+          throw new Error(data.error || `지우지 못했어요 (${res.status}) ${snippet}`);
+        }
         status.textContent = '지웠어요. 1–2분 뒤 사이트에서 사라져요.';
         setTimeout(() => (location.href = b.dataset.back!), 1500);
       } catch (err) {

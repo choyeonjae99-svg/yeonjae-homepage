@@ -28,6 +28,19 @@ const list = (v: unknown) =>
     .filter(Boolean)
     .slice(0, 12);
 const isExt = (e: unknown): e is ImageExt => IMAGE_EXT.includes(e as ImageExt);
+/** 어떤 에러든 사람이 읽을 수 있는 한 줄로 */
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** 처리 중 예상 못 한 에러가 나도 빈 500 대신 이유를 담아 돌려준다 (Vercel 로그에도 남긴다) */
+const safe =
+  (h: APIRoute): APIRoute =>
+  async (ctx) => {
+    try {
+      return await h(ctx);
+    } catch (e) {
+      console.error('[api/admin/posts]', ctx.request.method, e);
+      return json({ error: `서버 오류: ${msg(e)}` }, 500);
+    }
+  };
 const isSha = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f]{40}$/.test(s);
 const BODY_IMAGE_RE = /^b\d{2,3}\.(jpg|jpeg|png|webp|gif)$/;
 const base = (p: string) => p.slice(p.lastIndexOf('/') + 1);
@@ -36,7 +49,7 @@ const preview = (repoPath: string) => `/api/admin/file?p=${encodeURIComponent(re
 const previewPrefix = (kind: string, slug: string) => `/api/admin/file?p=${uploadDir(kind, slug)}/`;
 
 /** 새 게시물 올리기: 마크다운 + (미리 올린) 이미지 blob 들을 한 커밋으로 */
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST: APIRoute = safe(async ({ request, cookies }) => {
   if (!sameOrigin(request) || !isAdmin(cookies)) return json({ error: '권한이 없어요.' }, 403);
   if (!githubConfigured()) return json({ error: 'GITHUB_TOKEN 이 설정되지 않았어요.' }, 503);
   const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -96,12 +109,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const base = KINDS[b.kind].collection === 'portfolio' ? '/portfolio' : '/works';
     return json({ ok: true, commit: sha, url: `${base}/${slug}` }, 201);
   } catch (e) {
-    return json({ error: `올리지 못했어요. ${(e as Error).message}` }, 502);
+    return json({ error: `올리지 못했어요. ${msg(e)}` }, 502);
   }
-};
+});
 
 /** 게시물 지우기: 마크다운과 같은 이름 폴더의 이미지까지 */
-export const DELETE: APIRoute = async ({ request, cookies }) => {
+export const DELETE: APIRoute = safe(async ({ request, cookies }) => {
   if (!sameOrigin(request) || !isAdmin(cookies)) return json({ error: '권한이 없어요.' }, 403);
   if (!githubConfigured()) return json({ error: 'GITHUB_TOKEN 이 설정되지 않았어요.' }, 503);
   const b = (await request.json().catch(() => ({}))) as { kind?: unknown; slug?: unknown };
@@ -115,12 +128,12 @@ export const DELETE: APIRoute = async ({ request, cookies }) => {
     const sha = await commitFiles(paths.map((path) => ({ path, delete: true as const })), `Remove ${b.kind}: ${slug}`);
     return json({ ok: true, commit: sha });
   } catch (e) {
-    return json({ error: `지우지 못했어요. ${(e as Error).message}` }, 502);
+    return json({ error: `지우지 못했어요. ${msg(e)}` }, 502);
   }
-};
+});
 
 /** 수정 화면에 채울 내용: main 의 최신 파일을 읽는다 (배포를 기다리지 않아도 된다) */
-export const GET: APIRoute = async ({ url, cookies }) => {
+export const GET: APIRoute = safe(async ({ url, cookies }) => {
   if (!isAdmin(cookies)) return json({ error: '권한이 없어요.' }, 403);
   if (!githubConfigured()) return json({ error: 'GITHUB_TOKEN 이 설정되지 않았어요.' }, 503);
   const kind = url.searchParams.get('kind');
@@ -162,14 +175,14 @@ export const GET: APIRoute = async ({ url, cookies }) => {
       uploads,
     });
   } catch (e) {
-    return json({ error: `불러오지 못했어요. ${(e as Error).message}` }, 502);
+    return json({ error: `불러오지 못했어요. ${msg(e)}` }, 502);
   }
-};
+});
 
 type ImgIn = { keep?: unknown; sha?: unknown; ext?: unknown };
 
 /** 글 수정: 주소 이름(slug)·종류는 그대로, 내용·그림을 바꿔 한 커밋으로 */
-export const PUT: APIRoute = async ({ request, cookies }) => {
+export const PUT: APIRoute = safe(async ({ request, cookies }) => {
   if (!sameOrigin(request) || !isAdmin(cookies)) return json({ error: '권한이 없어요.' }, 403);
   if (!githubConfigured()) return json({ error: 'GITHUB_TOKEN 이 설정되지 않았어요.' }, 503);
   const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -286,6 +299,6 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     const site = isPortfolio ? '/portfolio' : '/works';
     return json({ ok: true, commit: sha, url: `${site}/${slug}` });
   } catch (e) {
-    return json({ error: `저장하지 못했어요. ${(e as Error).message}` }, 502);
+    return json({ error: `저장하지 못했어요. ${msg(e)}` }, 502);
   }
-};
+});

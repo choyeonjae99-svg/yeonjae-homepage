@@ -324,8 +324,13 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
   const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = document) => root.querySelector<T>(s);
   const api = async (url: string, init: RequestInit = {}) => {
     const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `요청이 실패했어요 (${res.status})`);
+    const text = await res.text();
+    let data: Record<string, any> = {};
+    try {
+      data = JSON.parse(text);
+    } catch {}
+    // 서버가 이유를 안 보내면 받은 내용 앞부분이라도 보여 준다
+    if (!res.ok) throw new Error(data.error || `요청이 실패했어요 (${res.status}) ${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)}`);
     return data;
   };
 
