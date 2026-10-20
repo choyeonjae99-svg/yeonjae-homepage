@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { isAdmin, json, sameOrigin } from '../../../lib/server/session';
 import { commitFiles, getText, githubConfigured, listTree, type TreeItem } from '../../../lib/server/github';
 import {
+  GALLERY_SIZES,
   IMAGE_EXT,
   KINDS,
   RICH_RE,
@@ -9,6 +10,7 @@ import {
   isKind,
   isSlug,
   readFrontmatter,
+  sizesOrUndefined,
   repoPathOf,
   rewriteMarkdown,
   slugify,
@@ -42,6 +44,7 @@ const safe =
     }
   };
 const isSha = (s: unknown): s is string => typeof s === 'string' && /^[0-9a-f]{40}$/.test(s);
+const sizeOf = (v: unknown) => (GALLERY_SIZES.includes(v as never) ? (v as string) : 'original');
 const BODY_IMAGE_RE = /^b\d{2,3}\.(jpg|jpeg|png|webp|gif)$/;
 const base = (p: string) => p.slice(p.lastIndexOf('/') + 1);
 /** 관리자 화면에서 아직 배포 안 된 그림도 미리 볼 수 있게 GitHub 에서 바로 읽어 오는 주소 */
@@ -97,6 +100,7 @@ export const POST: APIRoute = safe(async ({ request, cookies }) => {
       bodyHtml: bodyHtml || undefined,
       thumbExt: thumb ? (thumb.ext as ImageExt) : undefined,
       imageExts: images.map((i) => i.ext as ImageExt),
+      imageSizes: images.map((i) => sizeOf((i as { size?: unknown }).size)),
     });
 
     const items: TreeItem[] = [{ path: `${dir}/${slug}.md`, content: md }];
@@ -149,9 +153,10 @@ export const GET: APIRoute = safe(async ({ url, cookies }) => {
     const uploads = (await listTree(`${uploadDir(kind, slug)}/`)).map(base);
     const text = (v: unknown) => (v == null ? '' : String(v));
     const arr = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
-    const img = (rel: unknown) => {
+    const sizes = Array.isArray(d.imageSizes) ? d.imageSizes : [];
+    const img = (rel: unknown, i = -1) => {
       const p = repoPathOf(dir, rel);
-      return p ? { path: String(rel), url: preview(p) } : null;
+      return p ? { path: String(rel), url: preview(p), size: sizeOf(sizes[i]) } : null;
     };
     return json({
       kind,
@@ -166,7 +171,7 @@ export const GET: APIRoute = safe(async ({ url, cookies }) => {
       tools: arr(d.tools),
       thumbnailAlt: text(d.thumbnailAlt),
       thumbnail: img(d.thumbnail),
-      images: (Array.isArray(d.images) ? d.images : []).map(img).filter(Boolean),
+      images: (Array.isArray(d.images) ? d.images : []).map((r, i) => img(r, i)).filter(Boolean),
       mode: rich || !parts.body.trim() ? 'rich' : 'markdown',
       // 편집기 안에서는 본문 그림을 GitHub 에서 바로 읽어 보여 주고, 저장할 때 원래 주소로 되돌린다
       body: rich ? rich[1].split(uploadUrl(kind, slug)).join(previewPrefix(kind, slug)) : parts.body,
@@ -181,7 +186,7 @@ export const GET: APIRoute = safe(async ({ url, cookies }) => {
   }
 });
 
-type ImgIn = { keep?: unknown; sha?: unknown; ext?: unknown };
+type ImgIn = { keep?: unknown; sha?: unknown; ext?: unknown; size?: unknown };
 
 /** 글 수정: 주소 이름(slug)·종류는 그대로, 내용·그림을 바꿔 한 커밋으로 */
 export const PUT: APIRoute = safe(async ({ request, cookies }) => {
@@ -286,6 +291,7 @@ export const PUT: APIRoute = safe(async ({ request, cookies }) => {
       thumbnail,
       thumbnailAlt: thumbnail ? str(b.thumbnailAlt, 200) || title : undefined,
       images: nextImages.length ? nextImages : undefined,
+      imageSizes: nextImages.length ? sizesOrUndefined(images.map((i) => sizeOf(i.size))) : undefined,
     };
     if (isPortfolio) {
       Object.assign(changes, {

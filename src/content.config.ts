@@ -65,6 +65,7 @@ const portfolio = defineCollection({
       highlights: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
       links: z.array(z.object({ label: z.string(), href: z.url() })).default([]),
       images: z.array(image()).default([]),
+      imageSizes: z.array(z.enum(['original', 'small', 'medium', 'full'])).default([]), // images 와 같은 순서
       imagesCaption: z.string().optional(),
       draft: z.boolean().default(false), // true 면 사이트에 안 나온다
     }),
@@ -90,6 +91,7 @@ const works = defineCollection({
       summary: z.string().default(''),
       tags: z.array(z.string()).default([]),
       images: z.array(image()).default([]), // 그림: 상세 페이지에 크게 보여줄 이미지
+      imageSizes: z.array(z.enum(['original', 'small', 'medium', 'full'])).default([]), // images 와 같은 순서
       draft: z.boolean().default(false),
     }),
 });

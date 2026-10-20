@@ -168,7 +168,17 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
             <div class="field span2">
               <label for="u-images">글 아래 그림 모음 (선택)</label>
               <input id="u-images" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
-              <p class="hint">고를 때마다 뒤에 붙어요. ← → 로 순서를 바꾸고 ✕ 로 뺄 수 있어요. 본문 중간에 넣으려면 편집기의 그림 버튼을 쓰세요</p>
+              <p class="hint">고를 때마다 뒤에 붙어요. ← → 로 순서를 바꾸고 ✕ 로 뺄 수 있어요. 그림마다 보이는 크기를 고를 수 있어요(원본보다 크게 늘어나지 않아요). 본문 중간에 넣으려면 편집기의 그림 버튼을 쓰세요</p>
+              <div class="gallery-all" data-gallery-all hidden>
+                <label for="u-size-all">전체 크기</label>
+                <select id="u-size-all">
+                  <option value="">한꺼번에 바꾸기…</option>
+                  <option value="original">원본</option>
+                  <option value="small">작게 (40%)</option>
+                  <option value="medium">중간 (70%)</option>
+                  <option value="full">꽉 차게</option>
+                </select>
+              </div>
               <ol class="previews" data-previews></ol>
             </div>
           </div>
@@ -479,10 +489,21 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
 
     // ── 글 아래 그림 모음: 남길 그림(이미 올린 것) + 새 그림. 순서 바꾸기·빼기 ──
-    type GalleryItem = { keep: string; url: string } | { file: File; url: string };
+    type Size = 'original' | 'small' | 'medium' | 'full';
+    const SIZE_LABEL: Record<Size, string> = { original: '원본', small: '작게', medium: '중간', full: '꽉 차게' };
+    type GalleryItem = ({ keep: string } | { file: File }) & { url: string; size: Size };
     let gallery: GalleryItem[] = [];
     const galleryList = $('[data-previews]', form)!;
+    const allBox = $('[data-gallery-all]', form)!;
+    const allSel = $<HTMLSelectElement>('#u-size-all', form)!;
+    allSel.addEventListener('change', () => {
+      if (!allSel.value) return;
+      gallery.forEach((g) => (g.size = allSel.value as Size));
+      allSel.value = '';
+      renderGallery();
+    });
     const renderGallery = () => {
+      allBox.hidden = gallery.length < 2;
       galleryList.replaceChildren(
         ...gallery.map((it, i) => {
           const li = document.createElement('li');
@@ -506,14 +527,18 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
             mk('→', '뒤로', () => swap(i + 1), i === gallery.length - 1),
             mk('✕', '빼기', () => gallery.splice(i, 1)),
           );
-          li.append(img, no, tools);
+          const sel = document.createElement('select');
+          sel.setAttribute('aria-label', `${i + 1}번째 그림 크기`);
+          (Object.keys(SIZE_LABEL) as Size[]).forEach((k) => sel.append(new Option(`크기: ${SIZE_LABEL[k]}`, k, false, it.size === k)));
+          sel.addEventListener('change', () => (it.size = sel.value as Size));
+          li.append(img, no, tools, sel);
           return li;
         }),
       );
     };
     const imagesInput = $<HTMLInputElement>('#u-images', form)!;
     imagesInput.addEventListener('change', () => {
-      gallery.push(...[...(imagesInput.files ?? [])].map((file) => ({ file, url: URL.createObjectURL(file) })));
+      gallery.push(...[...(imagesInput.files ?? [])].map((file) => ({ file, url: URL.createObjectURL(file), size: 'original' as Size })));
       imagesInput.value = '';
       renderGallery();
     });
@@ -521,7 +546,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     // ── 수정: 지금 저장된 내용 불러오기 ──
     type Loaded = {
       title: string; subtitle: string; date: string; period: string; summary: string; tags: string[]; role: string; tools: string[];
-      thumbnailAlt: string; thumbnail: { path: string; url: string } | null; images: { path: string; url: string }[];
+      thumbnailAlt: string; thumbnail: { path: string; url: string } | null; images: { path: string; url: string; size: Size }[];
       mode: 'rich' | 'markdown'; body: string; previewPrefix: string; uploadPrefix: string; assetPrefix: string; uploads: string[];
     };
     let loaded: Loaded | null = null;
@@ -588,7 +613,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         tools: list(fd.get('tools')),
         thumbUrl,
         thumbAlt: String(fd.get('thumbnailAlt') ?? ''),
-        images: gallery.map((g) => g.url),
+        images: gallery.map((g) => ({ url: g.url, size: g.size })),
         bodyHtml: md ? markdownToHtml(mdArea.value, loaded?.assetPrefix) : rich.isEmpty() ? '' : `<div class="rich">${rich.editor.getHTML()}</div>`,
       });
       pvDialog.showModal();
@@ -614,7 +639,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         thumbRemove.checked = false;
         thumbNow.hidden = !d.thumbnail;
         if (d.thumbnail) $<HTMLImageElement>('[data-thumb-img]', thumbNow)!.src = d.thumbnail.url;
-        gallery = d.images.map((i) => ({ keep: i.path, url: i.url }));
+        gallery = d.images.map((i) => ({ keep: i.path, url: i.url, size: i.size }));
         renderGallery();
         const md = d.mode === 'markdown';
         mdBox.hidden = !md;
@@ -672,12 +697,12 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
 
         const newCount = gallery.filter((g) => 'file' in g).length;
         let done = 0;
-        const images: ({ keep: string } | { sha: string; ext: string })[] = [];
+        const images: (({ keep: string } | { sha: string; ext: string }) & { size: Size })[] = [];
         for (const g of gallery) {
-          if ('keep' in g) images.push({ keep: g.keep });
+          if ('keep' in g) images.push({ keep: g.keep, size: g.size });
           else {
             status.textContent = `이미지 올리는 중… (${++done}/${newCount})`;
-            images.push(await upload(g.file, 2000));
+            images.push({ ...(await upload(g.file, 2000)), size: g.size });
           }
         }
 
@@ -1283,6 +1308,24 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     background: var(--color-bg);
     border: 1px solid var(--color-border);
   }
+  .previews :global(select) {
+    min-height: var(--tap-min);
+    padding: 0 var(--space-2);
+    font-size: var(--text-caption);
+  }
+  .gallery-all {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .gallery-all label {
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+  .gallery-all select {
+    width: auto;
+  }
   .previews :global(.tools) {
     display: flex;
   }
@@ -1660,6 +1703,15 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     margin: 0 auto;
     border: 1px solid var(--color-border);
   }
+  .pv-body :global(.pv-figure[data-size='small']) {
+    width: 40%;
+  }
+  .pv-body :global(.pv-figure[data-size='medium']) {
+    width: 70%;
+  }
+  .pv-body :global(.pv-figure[data-size='full']) {
+    width: 100%;
+  }
   .pv-body :global(.pv-gallery) {
     display: grid;
     gap: var(--space-4);
@@ -1673,11 +1725,6 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-4);
-  }
-  .pv-body :global(.pv-gallery img) {
-    width: 100%;
-    height: auto;
-    border: 1px solid var(--color-border);
   }
 
   /* 방명록 관리 */

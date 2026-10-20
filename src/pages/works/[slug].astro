@@ -4,6 +4,7 @@ import { Image } from 'astro:assets';
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import OwnerPostTools from '../../components/OwnerPostTools.astro';
+import Figure from '../../components/Figure.astro';
 import { formatDate } from '../../data/format';
 import { IMAGE_QUALITY, widthsFor } from '../../data/images';
 
@@ -74,14 +75,12 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
       <div class="figures">
         {figures.map((img, i) => (
           <figure>
-            <Image
-              src={img}
+            <Figure
+              img={img}
               alt={i === 0 && d.thumbnailAlt ? d.thumbnailAlt : `${d.title} ${i + 1}`}
-              widths={widthsFor(img, [800, 1600, 2000])}
-              sizes={`(max-width: 1440px) min(calc(100vw - 96px), ${img.width}px), ${Math.min(1344, img.width)}px`}
-              format="webp"
-              quality={IMAGE_QUALITY}
-              style={`max-width:${img.width}px`}
+              size={d.images.length > 0 ? d.imageSizes[i] : undefined}
+              maxWidth={1344}
+              loading={i === 0 ? 'eager' : 'lazy'}
             />
           </figure>
         ))}
@@ -168,7 +167,7 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
     margin: 0;
   }
   /* 원본보다 크게 늘리지 않고 가운데에 (max-width 는 각 그림의 원본 가로) */
-  figure img {
+  .cover img {
     width: 100%;
     height: auto;
     margin: 0 auto;
