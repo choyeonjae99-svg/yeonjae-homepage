@@ -25,6 +25,7 @@ export const NAV = [
   { href: '/portfolio', label: '포트폴리오' },
   { href: '/works', label: '그 외 작업물' },
   { href: '/guestbook', label: '방명록' },
+  { href: '/postit', label: '포스트잇' },
 ] as const;
 
 /** 콘텐츠를 GitHub 에서 바로 추가할 때 쓰는 저장소 정보 (포트폴리오 추가 버튼) */

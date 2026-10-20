@@ -1,0 +1,456 @@
+---
+/*
+ * 포스트잇: 주인의 짧은 메모를 메모판에 붙여 둔 모양으로 보여 준다.
+ * 누구나 볼 수 있고, /admin 에서 로그인한 주인만 붙이기·고치기·떼기가 보인다(권한은 서버가 다시 확인).
+ * 메모는 Redis 에 저장되어 다시 배포하지 않아도 바로 반영된다 (/api/postit).
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageIntro from '../components/PageIntro.astro';
+
+const COLORS = [
+  { id: 'cream', label: '크림' },
+  { id: 'pink', label: '분홍' },
+  { id: 'wine', label: '와인' },
+  { id: 'gray', label: '회색' },
+];
+---
+
+<BaseLayout title="포스트잇" description="조연재가 메모판에 붙여 둔 짧은 메모들.">
+  <PageIntro label="Post-it" title="포스트잇" lead="생각날 때마다 붙여 두는 짧은 메모들이에요." />
+
+  <section class="board" aria-labelledby="pi-title">
+    <h2 class="visually-hidden" id="pi-title">메모</h2>
+    <p class="caption board-msg" data-pi-msg>메모를 불러오는 중…</p>
+
+    <ul class="notes" data-pi-list>
+      <!-- 주인만: 새 메모 붙이기 -->
+      <li class="note new" data-pi-new hidden>
+        <span class="pin" aria-hidden="true"></span>
+        <form class="editor" data-pi-form>
+          <label class="visually-hidden" for="pi-text">새 메모</label>
+          <textarea id="pi-text" name="text" rows="6" maxlength="500" placeholder="새 메모를 적어요"></textarea>
+          <fieldset class="colors">
+            <legend class="visually-hidden">메모 색</legend>
+            {COLORS.map((c, i) => (
+              <label class:list={['swatch', c.id]} title={c.label}>
+                <input type="radio" name="color" value={c.id} checked={i === 0} />
+                <span class="visually-hidden">{c.label}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div class="row">
+            <span class="count pixel-label" data-pi-count>0/500</span>
+            <button type="submit" class="act">붙이기</button>
+          </div>
+        </form>
+      </li>
+    </ul>
+    <p class="status" role="status" aria-live="polite" data-pi-status></p>
+  </section>
+
+  <template id="pi-note">
+    <li class="note">
+      <span class="pin" aria-hidden="true"></span>
+      <p class="text"></p>
+      <p class="meta"><time class="pixel-label"></time></p>
+      <div class="owner" hidden>
+        <button type="button" class="act" data-edit>고치기</button>
+        <button type="button" class="act" data-del>떼기</button>
+      </div>
+    </li>
+  </template>
+</BaseLayout>
+
+<script>
+  type Note = { id: string; text: string; color: string; createdAt: number; updatedAt?: number };
+  const COLORS = ['cream', 'pink', 'wine', 'gray'];
+  const LABEL: Record<string, string> = { cream: '크림', pink: '분홍', wine: '와인', gray: '회색' };
+
+  const fmt = (t: number) => {
+    const d = new Date(t);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+  };
+  // 메모마다 조금씩 기울어지게 (id 로 정해서 새로고침해도 같다)
+  const tilt = (id: string) => {
+    let h = 0;
+    for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0;
+    return [-2, -1, 1, 2, -1.5, 1.5][Math.abs(h) % 6];
+  };
+  const api = async (url: string, init: RequestInit = {}) => {
+    const res = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...init.headers } });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 403) throw new Error('로그인이 끝났어요. /admin 에서 다시 로그인해 주세요.');
+    if (!res.ok) throw new Error(data.error || `요청이 실패했어요 (${res.status})`);
+    return data;
+  };
+
+  function setup() {
+    const list = document.querySelector<HTMLUListElement>('[data-pi-list]');
+    if (!list || list.dataset.ready) return;
+    list.dataset.ready = '1';
+    const msg = document.querySelector<HTMLElement>('[data-pi-msg]')!;
+    const status = document.querySelector<HTMLElement>('[data-pi-status]')!;
+    const newCard = document.querySelector<HTMLElement>('[data-pi-new]')!;
+    const form = document.querySelector<HTMLFormElement>('[data-pi-form]')!;
+    const tpl = document.getElementById('pi-note') as HTMLTemplateElement;
+    let owner = false;
+    let notes: Note[] = [];
+
+    const colorPicker = (name: string, current: string) => {
+      const fs = document.createElement('fieldset');
+      fs.className = 'colors';
+      fs.innerHTML = '<legend class="visually-hidden">메모 색</legend>';
+      COLORS.forEach((c) => {
+        const l = document.createElement('label');
+        l.className = `swatch ${c}`;
+        l.title = LABEL[c];
+        const r = Object.assign(document.createElement('input'), { type: 'radio', name, value: c, checked: c === current });
+        l.append(r, Object.assign(document.createElement('span'), { className: 'visually-hidden', textContent: LABEL[c] }));
+        fs.append(l);
+      });
+      return fs;
+    };
+
+    const card = (n: Note) => {
+      const li = tpl.content.firstElementChild!.cloneNode(true) as HTMLLIElement;
+      li.dataset.color = n.color;
+      li.dataset.id = n.id;
+      li.style.setProperty('--tilt', `${tilt(n.id)}deg`);
+      li.querySelector('.text')!.textContent = n.text;
+      const time = li.querySelector('time')!;
+      time.dateTime = new Date(n.createdAt).toISOString();
+      time.textContent = fmt(n.createdAt);
+      const tools = li.querySelector<HTMLElement>('.owner')!;
+      tools.hidden = !owner;
+      li.querySelector('[data-del]')!.addEventListener('click', async (e) => {
+        if (!confirm('이 메모를 뗄까요? 되돌릴 수 없어요.')) return;
+        (e.currentTarget as HTMLButtonElement).disabled = true;
+        try {
+          await api(`/api/postit?id=${n.id}`, { method: 'DELETE' });
+          notes = notes.filter((x) => x.id !== n.id);
+          li.remove();
+          status.textContent = '메모를 뗐어요.';
+          showEmpty();
+        } catch (err) {
+          status.textContent = (err as Error).message;
+        }
+      });
+      li.querySelector('[data-edit]')!.addEventListener('click', () => edit(li, n));
+      return li;
+    };
+
+    // 고치기: 메모 안에서 바로 글자·색을 바꾼다
+    const edit = (li: HTMLLIElement, n: Note) => {
+      const f = document.createElement('form');
+      f.className = 'editor';
+      const ta = Object.assign(document.createElement('textarea'), { value: n.text, rows: 6, maxLength: 500 });
+      ta.setAttribute('aria-label', '메모 고치기');
+      const row = document.createElement('div');
+      row.className = 'row';
+      const cancel = Object.assign(document.createElement('button'), { type: 'button', className: 'act', textContent: '취소' });
+      const save = Object.assign(document.createElement('button'), { type: 'submit', className: 'act', textContent: '저장' });
+      const picker = colorPicker(`c-${n.id}`, n.color);
+      picker.addEventListener('change', (e) => (li.dataset.color = (e.target as HTMLInputElement).value));
+      row.append(cancel, save);
+      f.append(ta, picker, row);
+      const keep = [...li.children].filter((c) => !c.classList.contains('pin'));
+      keep.forEach((c) => ((c as HTMLElement).hidden = true));
+      li.append(f);
+      ta.focus();
+      const close = () => {
+        f.remove();
+        keep.forEach((c) => ((c as HTMLElement).hidden = c.classList.contains('owner') ? !owner : false));
+        li.dataset.color = n.color;
+      };
+      cancel.addEventListener('click', close);
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        save.disabled = true;
+        try {
+          const color = (f.querySelector('input:checked') as HTMLInputElement).value;
+          const { note } = await api('/api/postit', { method: 'PATCH', body: JSON.stringify({ id: n.id, text: ta.value, color }) });
+          Object.assign(n, note);
+          li.querySelector('.text')!.textContent = n.text;
+          close();
+          status.textContent = '메모를 고쳤어요.';
+        } catch (err) {
+          status.textContent = (err as Error).message;
+          save.disabled = false;
+        }
+      });
+    };
+
+    const showEmpty = () => {
+      msg.hidden = notes.length > 0;
+      msg.textContent = owner ? '아직 붙인 메모가 없어요. 첫 메모를 붙여 보세요.' : '아직 붙인 메모가 없어요.';
+    };
+
+    const render = () => {
+      list.querySelectorAll('.note:not(.new)').forEach((el) => el.remove());
+      list.append(...notes.map(card));
+      newCard.hidden = !owner;
+      showEmpty();
+    };
+
+    const text = form.querySelector('textarea')!;
+    const count = form.querySelector('[data-pi-count]')!;
+    text.addEventListener('input', () => (count.textContent = `${text.value.length}/500`));
+    form.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.name === 'color') newCard.dataset.color = t.value;
+    });
+    newCard.dataset.color = 'cream';
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      btn.disabled = true;
+      try {
+        const color = (form.querySelector('input[name="color"]:checked') as HTMLInputElement).value;
+        const { note } = await api('/api/postit', { method: 'POST', body: JSON.stringify({ text: text.value, color }) });
+        notes.unshift(note);
+        newCard.after(card(note));
+        text.value = '';
+        count.textContent = '0/500';
+        status.textContent = '메모를 붙였어요.';
+        showEmpty();
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    api('/api/postit', { method: 'GET' })
+      .then((d) => {
+        owner = Boolean(d.owner);
+        notes = d.notes;
+        render();
+      })
+      .catch(() => {
+        msg.textContent = '포스트잇을 준비하고 있어요.';
+      });
+  }
+  document.addEventListener('astro:page-load', setup);
+</script>
+
+<style>
+  /* 메모판: 표면색 판 + 촘촘한 도트 + 픽셀 테두리 */
+  .board {
+    position: relative;
+    padding: var(--space-7) var(--space-6);
+    background-color: var(--color-surface);
+    background-image: radial-gradient(var(--color-border) 1px, transparent 1.5px);
+    background-size: 8px 8px;
+    border: 2px solid var(--color-border);
+    box-shadow:
+      inset 0 0 0 4px var(--color-bg),
+      inset 0 0 0 6px var(--color-border);
+  }
+  .board-msg {
+    margin-bottom: var(--space-5);
+  }
+  .notes {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-7) var(--space-6);
+    align-items: start;
+  }
+
+  /* 메모 한 장 */
+  .note {
+    --paper: var(--color-text);
+    --ink: var(--color-bg);
+    --ink-soft: var(--ink);
+    position: relative;
+    display: grid;
+    gap: var(--space-3);
+    min-height: 200px;
+    padding: var(--space-6) var(--space-4) var(--space-4);
+    background: var(--paper);
+    color: var(--ink);
+    transform: rotate(var(--tilt, 0deg));
+    box-shadow: 6px 6px 0 rgb(0 0 0 / 0.35);
+    transition: transform var(--dur-fast) steps(2);
+  }
+  .note:hover,
+  .note:focus-within {
+    transform: rotate(0deg) translate(-2px, -2px);
+    box-shadow: 8px 8px 0 rgb(0 0 0 / 0.35);
+  }
+  /* 오른쪽 아래 접힌 모서리 (픽셀 계단) */
+  .note::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, transparent 0 50%, rgb(0 0 0 / 0.25) 50% 100%);
+  }
+  .note[data-color='pink'] {
+    --paper: var(--color-accent-light);
+  }
+  .note[data-color='wine'] {
+    --paper: var(--color-accent-deep);
+    --ink: var(--color-text);
+  }
+  .note[data-color='gray'] {
+    --paper: var(--color-node);
+  }
+  /* 압정: 자홍 네모 픽셀 */
+  .pin {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    background: var(--color-accent);
+    box-shadow: 2px 2px 0 rgb(0 0 0 / 0.45);
+  }
+  .note[data-color='pink'] .pin {
+    background: var(--color-accent-deep);
+  }
+  .text {
+    margin: 0;
+    white-space: pre-wrap;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  .meta {
+    align-self: end;
+    margin: 0;
+  }
+  .meta .pixel-label {
+    color: var(--ink-soft);
+  }
+  .owner,
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .row {
+    justify-content: space-between;
+  }
+  .act {
+    min-height: var(--tap-min);
+    padding: 0 var(--space-3);
+    border: 1px solid currentColor;
+    color: var(--ink);
+    font-size: var(--text-caption);
+  }
+  .act:hover {
+    background: rgb(0 0 0 / 0.08);
+  }
+  .act:disabled {
+    opacity: 0.5;
+  }
+  .count {
+    color: var(--ink-soft);
+  }
+
+  /* 쓰기·고치기 */
+  .note :global(.editor) {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .note :global(textarea) {
+    width: 100%;
+    min-height: 120px;
+    padding: var(--space-2);
+    resize: vertical;
+    background: transparent;
+    border: 1px dashed currentColor;
+    border-radius: 0;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .note :global(textarea::placeholder) {
+    color: var(--ink-soft);
+  }
+  .note :global(textarea:focus-visible) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .note.new {
+    border: 2px dashed var(--color-accent);
+  }
+  .note :global(.colors) {
+    display: flex;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .note :global(.swatch) {
+    position: relative;
+    display: inline-flex;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .note :global(.swatch::before) {
+    content: '';
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--color-bg);
+  }
+  .note :global(.swatch.cream::before) {
+    background: var(--color-text);
+  }
+  .note :global(.swatch.pink::before) {
+    background: var(--color-accent-light);
+  }
+  .note :global(.swatch.wine::before) {
+    background: var(--color-accent-deep);
+  }
+  .note :global(.swatch.gray::before) {
+    background: var(--color-node);
+  }
+  .note :global(.swatch input) {
+    position: absolute;
+    opacity: 0;
+  }
+  .note :global(.swatch:has(input:checked)::before) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .note :global(.swatch:has(input:focus-visible)::before) {
+    outline: 2px solid var(--ink);
+    outline-offset: 4px;
+  }
+  .status {
+    margin-top: var(--space-5);
+    font-size: var(--text-caption);
+    color: var(--color-accent-light);
+  }
+
+  @media (max-width: 640px) {
+    .board {
+      padding: var(--space-6) var(--space-4);
+    }
+    .notes {
+      grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+      gap: var(--space-6) var(--space-4);
+    }
+    .note {
+      min-height: 150px;
+      padding: var(--space-5) var(--space-3) var(--space-3);
+    }
+    .note.new {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
