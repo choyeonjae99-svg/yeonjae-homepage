@@ -14,11 +14,59 @@ const year = new Date().getFullYear();
   <footer class="site-footer page" data-footer>
     <span class="caption">© {year} {SITE.name}</span>
     <a class="caption mail" href={`mailto:${SITE.email}`}>{SITE.email}</a>
-    <a class="pixel-label top" href="#top">Top</a>
+    <div class="end">
+      <!-- 로그인 안 한 브라우저: 로그인 / 로그인한 주인: 관리자 · 로그아웃 (BaseLayout 이 보여줄지 정한다) -->
+      <a class="caption auth" href="/admin" data-guest-only data-login-link>
+        <svg width="10" height="10" viewBox="0 0 10 10" shape-rendering="crispEdges" aria-hidden="true">
+          <rect x="3" y="0" width="4" height="2" /><rect x="2" y="1" width="2" height="4" /><rect x="6" y="1" width="2" height="4" />
+          <rect x="1" y="4" width="8" height="6" />
+        </svg>
+        로그인
+      </a>
+      <a class="caption auth" href="/admin" data-owner-only hidden>관리자</a>
+      <button type="button" class="caption auth" data-owner-only data-footer-logout hidden>로그아웃</button>
+      <a class="pixel-label top" href="#top">Top</a>
+    </div>
   </footer>
 )}
 
+<script>
+  // 로그인하면 지금 보던 페이지로 돌아오게 주소를 붙인다
+  document.addEventListener('astro:page-load', () => {
+    const link = document.querySelector<HTMLAnchorElement>('[data-login-link]');
+    if (link) link.href = `/admin?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`;
+    const out = document.querySelector<HTMLButtonElement>('[data-footer-logout]');
+    if (out && !out.dataset.ready) {
+      out.dataset.ready = '1';
+      out.addEventListener('click', async () => {
+        out.disabled = true;
+        await fetch('/api/admin/login', { method: 'DELETE' }).catch(() => {});
+        location.reload();
+      });
+    }
+  });
+</script>
+
 <style>
+  .end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-5);
+  }
+  .auth {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    transition: color var(--dur-fast) var(--step-fast);
+  }
+  .auth svg {
+    fill: currentColor;
+  }
+  .auth:hover {
+    color: var(--color-text);
+  }
   .site-footer {
     display: flex;
     align-items: center;

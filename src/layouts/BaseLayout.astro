@@ -38,6 +38,7 @@ const { title, description, variant = 'page', noindex = false } = Astro.props;
   function applyOwnerMode() {
     const owner = /(?:^|;\s*)yj_admin=1(?:;|$)/.test(document.cookie);
     document.querySelectorAll<HTMLElement>('[data-owner-only]').forEach((el) => (el.hidden = !owner));
+    document.querySelectorAll<HTMLElement>('[data-guest-only]').forEach((el) => (el.hidden = owner));
   }
   document.addEventListener('astro:page-load', applyOwnerMode);
 </script>
