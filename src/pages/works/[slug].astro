@@ -3,6 +3,7 @@ import type { GetStaticPaths } from 'astro';
 import { Image } from 'astro:assets';
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import OwnerPostTools from '../../components/OwnerPostTools.astro';
 import { formatDate } from '../../data/format';
 import { IMAGE_QUALITY, widthsFor } from '../../data/images';
 
@@ -52,6 +53,8 @@ const figures = d.images.length > 0 ? d.images : isDrawing && d.thumbnail ? [d.t
         </ul>
       )}
     </header>
+
+    <OwnerPostTools kind={d.category} slug={entry.id} title={d.title} back={`/works#${d.category}`} />
 
     {!isDrawing && d.thumbnail && (
       <figure class="cover">

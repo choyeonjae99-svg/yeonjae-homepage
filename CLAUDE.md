@@ -29,7 +29,7 @@
   ├ 필터: 글 / 그림
   └ /works/[slug]     게시글 상세
 /guestbook            방명록 (방문자가 연락을 남기는 곳)
-/admin                관리자 (주인 전용, 검색 제외) — 올리기 · 방명록 관리 · 박자 맞추기 · 올린 글
+/admin                관리자 (주인 전용, 검색 제외) — 올리기 · 방명록 관리 · 박자 맞추기 · 올린 글(수정·지우기)
 ```
 
 - 메뉴는 **소개 · 포트폴리오 · 그 외 작업물 · 방명록** 네 개. (방명록은 주인 요청으로 추가, 720px 이하는 햄버거 메뉴)
@@ -155,6 +155,7 @@ summary: 카드에 보일 한 줄 설명
 - **Vercel 환경변수:** `ADMIN_PASSWORD`(관리자 비밀번호), `SESSION_SECRET`(16자 이상 임의 문자열), `GITHUB_TOKEN`(fine-grained, 이 저장소만, Contents: Read and write), Upstash Redis(Vercel Marketplace 연동 시 `KV_REST_API_URL`·`KV_REST_API_TOKEN` 자동 등록). 없으면 해당 기능만 "준비 중"으로 뜬다.
 - **방명록:** Redis 에 저장(`src/lib/server/guestbook.ts`). 기본 비공개(주인만 봄), 쓴 사람이 체크하면 공개. 연락처는 항상 주인만. 10분에 3번 제한, 스팸 함정 칸, 글은 텍스트로만 표시. 주인은 `/admin` 에서 답장·공개 전환·삭제.
 - **올리기:** `/admin` 에서 비밀번호 로그인(서명된 httpOnly 쿠키, 15분에 10번 제한) → 이미지는 브라우저에서 줄여(썸네일 1600px, 상세 2000px, WebP) 한 장씩 GitHub blob 으로, 마크다운과 함께 한 커밋으로 `main` 에 올린다(`src/lib/server/github.ts`) → Vercel 재배포(1–2분). 올린 글 삭제도 같은 방식.
+- **수정·지우기:** 상세 페이지에 주인 전용 `수정 · 지우기` 줄(`OwnerPostTools.astro`), `/admin` → 올린 글에도 같은 버튼. 수정은 `/admin?edit=<kind>/<slug>` — main 의 최신 파일을 GitHub 에서 읽어 채운다(`GET/PUT /api/admin/posts`, 미리보기 그림은 `/api/admin/file`). 주소 이름·종류는 못 바꾼다. 그림 모음은 순서 바꾸기·빼기·추가, 썸네일 바꾸기·빼기, 안 쓰게 된 그림 파일은 같은 커밋에서 지운다. frontmatter 는 바꾼 값만 고치고 나머지(highlights·links 등)는 그대로 둔다(`yaml`). 편집기로 쓰지 않은 마크다운 본문(연구 포트폴리오의 표 등)은 글자 그대로 고치는 칸으로 열린다.
 - 쓰기 요청은 모두 같은 출처(Origin)만 받는다. `yj_admin` 쿠키는 화면에 추가 버튼을 보여줄지 정하는 표시용이고 권한이 아니다.
 - 로컬 `npm run dev` 에서는 Redis 가 없으면 메모리에 임시 저장한다.
 
@@ -208,6 +209,7 @@ summary: 카드에 보일 한 줄 설명
 9. [x] 배포 — **Vercel** (`yeonjae-homepage.vercel.app`, GitHub `main` 자동 배포). `astro.config.mjs` 의 `site` 는 Vercel 운영 도메인(`VERCEL_PROJECT_PRODUCTION_URL`)을 자동으로 쓰므로, 개인 도메인을 연결하면 다음 배포부터 공유 미리보기 주소도 바뀐다(직접 지정은 `SITE_URL`). 개인 도메인은 아직
 10. [x] 추가 기능 — 방명록(`/guestbook`), 관리자 올리기(`/admin`), 음악 박자 동기화(`src/data/music.json`). 설정은 6-0
 11. [x] 본문 편집기(서식·그림 배치) + 그림 늘어남·화질 깨짐 수정 — 6-0-1
+12. [x] 올린 글 수정·지우기 — 6-0
 
 ## 10. 아직 받아야 할 자료
 

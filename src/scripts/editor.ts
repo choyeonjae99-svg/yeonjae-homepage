@@ -40,6 +40,8 @@ export interface RichEditor {
   htmlWith(map: Map<string, string>): string;
   isEmpty(): boolean;
   clear(): void;
+  /** 이미 저장된 본문을 불러온다 (수정) */
+  setHTML(html: string): void;
 }
 
 export function createEditor(
@@ -216,6 +218,11 @@ export function createEditor(
       editor.commands.clearContent();
       files.forEach((_, src) => URL.revokeObjectURL(src));
       files.clear();
+    },
+    setHTML: (html: string) => {
+      files.forEach((_, src) => URL.revokeObjectURL(src));
+      files.clear();
+      editor.commands.setContent(html, { emitUpdate: false });
     },
   };
 }
