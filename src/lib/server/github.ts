@@ -5,7 +5,7 @@ import { env } from './env';
  * GitHub Git Data API 로 여러 파일을 커밋 하나로 올린다.
  * main 에 커밋되면 Vercel 이 자동으로 다시 배포한다.
  */
-async function gh<T>(path: string, init?: RequestInit): Promise<T> {
+async function ghFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = env.githubToken();
   if (!token) throw new Error('GITHUB_TOKEN 이 설정되지 않았습니다');
   const res = await fetch(`${env.githubApi()}/repos/${REPO.owner}/${REPO.name}${path}`, {
@@ -22,7 +22,29 @@ async function gh<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '');
     throw Object.assign(new Error(`GitHub ${res.status}: ${text.slice(0, 200)}`), { status: res.status });
   }
-  return res.json() as Promise<T>;
+  return res;
+}
+async function gh<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await ghFetch(path, init)).json() as Promise<T>;
+}
+
+/**
+ * main 에 있는 파일 하나를 그대로 받는다 (수정 화면은 배포를 기다리지 않고 최신 내용을 읽는다).
+ * 없으면 null.
+ */
+export async function getRaw(path: string): Promise<ArrayBuffer | null> {
+  const url = `/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${REPO.branch}`;
+  try {
+    const res = await ghFetch(url, { headers: { accept: 'application/vnd.github.raw+json' } });
+    return await res.arrayBuffer();
+  } catch (e) {
+    if ((e as { status?: number }).status === 404) return null;
+    throw e;
+  }
+}
+export async function getText(path: string): Promise<string | null> {
+  const buf = await getRaw(path);
+  return buf ? new TextDecoder().decode(buf) : null;
 }
 
 export const githubConfigured = () => Boolean(env.githubToken());

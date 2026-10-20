@@ -4,7 +4,7 @@
  * - 올리기: 포트폴리오(연구·디자인) / 그 외 작업물(글·그림) 을 GitHub 에 커밋 → 자동 재배포
  * - 방명록: 비공개 글·연락처 보기, 답장, 공개 전환, 삭제
  * - 박자 맞추기: 음악을 들으며 탭해서 BPM·첫 박 위치를 정해 저장
- * - 올린 글: 지우기
+ * - 올린 글: 수정 · 지우기 (/admin?edit=<kind>/<slug> 로 열면 그 글을 고치는 화면)
  */
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -22,7 +22,10 @@ const loggedIn = configured && isAdmin(Astro.cookies);
 const hasGithub = githubConfigured();
 const hasStore = Boolean(getStore());
 const kindParam = Astro.url.searchParams.get('kind');
-const initialKind = kindParam && kindParam in KINDS ? kindParam : 'design';
+// 수정: ?edit=<kind>/<slug>
+const [editKind, editSlug] = (Astro.url.searchParams.get('edit') ?? '').split('/');
+const editing = editKind in KINDS && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editSlug ?? '');
+const initialKind = editing ? editKind : kindParam && kindParam in KINDS ? kindParam : 'design';
 const today = new Date().toISOString().slice(0, 10);
 
 const posts = loggedIn
@@ -64,7 +67,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     <>
       <div class="bar">
         <div class="tabs" role="tablist" aria-label="관리 메뉴" data-admin-tabs>
-          <button type="button" role="tab" id="t-upload" aria-controls="p-upload" aria-selected="true" data-tab="upload">올리기</button>
+          <button type="button" role="tab" id="t-upload" aria-controls="p-upload" aria-selected="true" data-tab="upload">{editing ? '글 수정' : '올리기'}</button>
           <button type="button" role="tab" id="t-guestbook" aria-controls="p-guestbook" aria-selected="false" tabindex="-1" data-tab="guestbook">방명록</button>
           <button type="button" role="tab" id="t-beat" aria-controls="p-beat" aria-selected="false" tabindex="-1" data-tab="beat">박자 맞추기</button>
           <button type="button" role="tab" id="t-posts" aria-controls="p-posts" aria-selected="false" tabindex="-1" data-tab="posts">올린 글</button>
@@ -81,8 +84,14 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
 
       <!-- 올리기 -->
       <section role="tabpanel" id="p-upload" aria-labelledby="t-upload" data-panel="upload">
-        <form class="upload" data-upload novalidate>
-          <fieldset class="kinds">
+        {editing && (
+          <div class="edit-bar">
+            <p><span class="pixel-label">Edit</span> 올린 글을 고치는 중이에요. 주소 이름과 종류는 바꿀 수 없어요.</p>
+            <a class="btn ghost" href="/admin">새 글 쓰기로</a>
+          </div>
+        )}
+        <form class="upload" data-upload novalidate data-edit-kind={editing ? editKind : undefined} data-edit-slug={editing ? editSlug : undefined}>
+          <fieldset class="kinds" disabled={editing}>
             <legend class="pixel-label">Type</legend>
             {Object.entries(KINDS).map(([k, v]) => (
               <label class="kind">
@@ -121,8 +130,8 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
             </div>
             <div class="field">
               <label for="u-slug">주소 이름 (영문)</label>
-              <input id="u-slug" name="slug" type="text" maxlength="60" pattern="[a-z0-9-]*" placeholder="예: poster-series" />
-              <p class="hint">비우면 날짜로 자동: 주소가 /…/이름 이 돼요</p>
+              <input id="u-slug" name="slug" type="text" maxlength="60" pattern="[a-z0-9-]*" placeholder="예: poster-series" readonly={editing} value={editing ? editSlug : undefined} />
+              <p class="hint">{editing ? '이미 올린 글의 주소는 그대로 둬요' : '비우면 날짜로 자동: 주소가 /…/이름 이 돼요'}</p>
             </div>
             <div class="field" data-for="portfolio">
               <label for="u-role">역할</label>
@@ -137,8 +146,12 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           <div class="grid2">
             <div class="field">
               <label for="u-thumb">썸네일 이미지</label>
+              <div class="thumb-now" data-thumb-now hidden>
+                <img alt="지금 썸네일" data-thumb-img />
+                <label class="check"><input type="checkbox" data-thumb-remove /> 썸네일 빼기</label>
+              </div>
               <input id="u-thumb" name="thumb" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
-              <p class="hint">3:2 비율 권장. 2000px·3MB 이하는 원본 그대로 올려요</p>
+              <p class="hint">3:2 비율 권장. 2000px·3MB 이하는 원본 그대로 올려요{editing && ' · 새 파일을 고르면 바뀌어요'}</p>
             </div>
             <div class="field">
               <label for="u-alt">썸네일 설명</label>
@@ -146,15 +159,19 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
             </div>
             <div class="field span2">
               <label for="u-images">글 아래 그림 모음 (선택)</label>
-              <input id="u-images" name="images" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
-              <p class="hint">고른 순서대로 본문 아래에 모아서 보여요. 본문 중간에 넣으려면 편집기의 그림 버튼을 쓰세요</p>
-              <ul class="previews" data-previews></ul>
+              <input id="u-images" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+              <p class="hint">고를 때마다 뒤에 붙어요. ← → 로 순서를 바꾸고 ✕ 로 뺄 수 있어요. 본문 중간에 넣으려면 편집기의 그림 버튼을 쓰세요</p>
+              <ol class="previews" data-previews></ol>
             </div>
           </div>
 
           <div class="field">
             <span class="label" id="u-body-label">본문</span>
-            <div class="editor" aria-labelledby="u-body-label">
+            <div class="md-box" data-md-box hidden>
+              <p class="hint">이 글은 마크다운(표·목록 기호)으로 쓰여 있어서 글자 그대로 고쳐요. <code>##</code> 소제목, <code>**굵게**</code>, <code>| 표 |</code></p>
+              <textarea data-markdown rows="24" aria-labelledby="u-body-label" spellcheck="false"></textarea>
+            </div>
+            <div class="editor" aria-labelledby="u-body-label" data-editor-box>
               <div class="toolbar" role="toolbar" aria-label="본문 서식" data-toolbar>
                 <div class="group">
                   <select data-block aria-label="문단 형식">
@@ -217,12 +234,13 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
               <div data-editor></div>
             </div>
             <p class="status" role="status" aria-live="polite" data-editor-notice></p>
-            <p class="hint">그림은 끌어다 놓거나 붙여 넣어도 들어가요. 그림을 누르면 크기를 고를 수 있고, 끌어서 위치를 옮길 수 있어요. 원본 크기보다 크게 늘어나지 않아요.</p>
+            <p class="hint" data-editor-hint>그림은 끌어다 놓거나 붙여 넣어도 들어가요. 그림을 누르면 크기를 고를 수 있고, 끌어서 위치를 옮길 수 있어요. 원본 크기보다 크게 늘어나지 않아요.</p>
           </div>
 
           <div class="actions">
-            <button type="submit" class="btn primary" disabled={!hasGithub}>올리기</button>
-            <p class="status" role="status" aria-live="polite" data-upload-status></p>
+            <button type="submit" class="btn primary" disabled={!hasGithub}>{editing ? '수정 저장' : '올리기'}</button>
+            {editing && <button type="button" class="btn ghost danger" data-edit-delete disabled={!hasGithub}>이 글 지우기</button>}
+            <p class="status" role="status" aria-live="polite" data-upload-status>{editing ? '불러오는 중…' : ''}</p>
           </div>
         </form>
       </section>
@@ -285,8 +303,9 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
           {posts.map((p) => (
             <li>
               <span class="pixel-label kind-l">{KINDS[p.kind as keyof typeof KINDS].label}</span>
-              <a href={`${p.base}/${p.slug}`}>{p.title}</a>
+              <a class="t" href={`${p.base}/${p.slug}`}>{p.title}</a>
               <span class="caption">{fmt(p.date)}</span>
+              <a class="btn ghost" href={`/admin?edit=${p.kind}/${p.slug}`}>수정</a>
               <button type="button" class="btn ghost danger" data-del-kind={p.kind} data-del-slug={p.slug} data-del-title={p.title} disabled={!hasGithub}>지우기</button>
             </li>
           ))}
@@ -400,8 +419,12 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     const form = $<HTMLFormElement>('[data-upload]');
     if (!form) return;
     const status = $('[data-upload-status]')!;
+    const editKind = form.dataset.editKind;
+    const editSlug = form.dataset.editSlug;
+    const editing = Boolean(editKind && editSlug);
+    const kindOf = () => editKind ?? (form.elements.namedItem('kind') as RadioNodeList).value;
     const syncKind = () => {
-      const kind = (form.elements.namedItem('kind') as RadioNodeList).value;
+      const kind = kindOf();
       const portfolio = kind === 'research' || kind === 'design';
       form.querySelectorAll<HTMLElement>('[data-for="portfolio"]').forEach((el) => (el.hidden = !portfolio));
     };
@@ -412,67 +435,173 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
 
     const notice = $('[data-editor-notice]', form)!;
     const rich = createEditor($('[data-editor]', form)!, $('[data-toolbar]', form)!, undefined, (msg) => (notice.textContent = msg));
+    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
 
-    const imagesInput = $<HTMLInputElement>('#u-images', form)!;
-    imagesInput.addEventListener('change', () => {
-      const ul = $('[data-previews]', form)!;
-      ul.replaceChildren(
-        ...[...(imagesInput.files ?? [])].map((f, i) => {
+    // ── 글 아래 그림 모음: 남길 그림(이미 올린 것) + 새 그림. 순서 바꾸기·빼기 ──
+    type GalleryItem = { keep: string; url: string } | { file: File; url: string };
+    let gallery: GalleryItem[] = [];
+    const galleryList = $('[data-previews]', form)!;
+    const renderGallery = () => {
+      galleryList.replaceChildren(
+        ...gallery.map((it, i) => {
           const li = document.createElement('li');
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(f);
-          img.alt = `${i + 1}번째 이미지 미리보기`;
-          li.append(img);
+          const img = Object.assign(document.createElement('img'), { src: it.url, alt: `${i + 1}번째 그림` });
+          const no = Object.assign(document.createElement('span'), { className: 'pixel-label no', textContent: String(i + 1).padStart(2, '0') });
+          if ('file' in it) no.textContent += ' NEW';
+          const tools = document.createElement('span');
+          tools.className = 'tools';
+          const mk = (text: string, label: string, fn: () => void, disabled = false) => {
+            const b = Object.assign(document.createElement('button'), { type: 'button', textContent: text, disabled });
+            b.setAttribute('aria-label', `${i + 1}번째 그림 ${label}`);
+            b.addEventListener('click', () => {
+              fn();
+              renderGallery();
+            });
+            return b;
+          };
+          const swap = (j: number) => ([gallery[i], gallery[j]] = [gallery[j], gallery[i]]);
+          tools.append(
+            mk('←', '앞으로', () => swap(i - 1), i === 0),
+            mk('→', '뒤로', () => swap(i + 1), i === gallery.length - 1),
+            mk('✕', '빼기', () => gallery.splice(i, 1)),
+          );
+          li.append(img, no, tools);
           return li;
         }),
       );
+    };
+    const imagesInput = $<HTMLInputElement>('#u-images', form)!;
+    imagesInput.addEventListener('change', () => {
+      gallery.push(...[...(imagesInput.files ?? [])].map((file) => ({ file, url: URL.createObjectURL(file) })));
+      imagesInput.value = '';
+      renderGallery();
+    });
+
+    // ── 수정: 지금 저장된 내용 불러오기 ──
+    type Loaded = {
+      title: string; subtitle: string; date: string; period: string; summary: string; tags: string[]; role: string; tools: string[];
+      thumbnailAlt: string; thumbnail: { path: string; url: string } | null; images: { path: string; url: string }[];
+      mode: 'rich' | 'markdown'; body: string; previewPrefix: string; uploadPrefix: string; uploads: string[];
+    };
+    let loaded: Loaded | null = null;
+    const thumbNow = $('[data-thumb-now]', form)!;
+    const thumbRemove = $<HTMLInputElement>('[data-thumb-remove]', form)!;
+    const mdBox = $('[data-md-box]', form)!;
+    const mdArea = $<HTMLTextAreaElement>('[data-markdown]', form)!;
+    const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    const load = async () => {
+      if (!editing) return;
+      submitBtn.disabled = true;
+      try {
+        const d = (await api(`/api/admin/posts?kind=${editKind}&slug=${editSlug}`, { method: 'GET' })) as Loaded;
+        loaded = d;
+        const set = (name: string, v: string) => field(name) && (field(name).value = v);
+        set('title', d.title);
+        set('subtitle', d.subtitle);
+        set('date', d.date);
+        set('period', d.period);
+        set('summary', d.summary);
+        set('tags', d.tags.join(', '));
+        set('role', d.role);
+        set('tools', d.tools.join(', '));
+        set('thumbnailAlt', d.thumbnailAlt);
+        field('thumb').value = '';
+        thumbRemove.checked = false;
+        thumbNow.hidden = !d.thumbnail;
+        if (d.thumbnail) $<HTMLImageElement>('[data-thumb-img]', thumbNow)!.src = d.thumbnail.url;
+        gallery = d.images.map((i) => ({ keep: i.path, url: i.url }));
+        renderGallery();
+        const md = d.mode === 'markdown';
+        mdBox.hidden = !md;
+        $('[data-editor-box]', form)!.hidden = md;
+        $('[data-editor-hint]', form)!.hidden = md;
+        if (md) mdArea.value = d.body;
+        else rich.setHTML(d.body);
+        status.textContent = '';
+        submitBtn.disabled = false;
+      } catch (err) {
+        status.textContent = (err as Error).message;
+      }
+    };
+    void load();
+
+    $('[data-edit-delete]', form)?.addEventListener('click', async (e) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      if (!confirm(`「${field('title').value}」을(를) 지울까요? 이미지도 함께 지워지고 되돌릴 수 없어요.`)) return;
+      b.disabled = true;
+      status.textContent = '지우는 중…';
+      try {
+        await api('/api/admin/posts', { method: 'DELETE', body: JSON.stringify({ kind: editKind, slug: editSlug }) });
+        status.textContent = '지웠어요. 1–2분 뒤 사이트에서 사라져요.';
+        setTimeout(() => (location.href = '/admin#posts'), 1200);
+      } catch (err) {
+        status.textContent = (err as Error).message;
+        b.disabled = false;
+      }
     });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (editing && !loaded) return;
       const fd = new FormData(form);
       const title = String(fd.get('title') ?? '').trim();
       if (!title) return void ((status.textContent = '제목을 적어 주세요.'), $<HTMLInputElement>('#u-title', form)!.focus());
-      let slug = String(fd.get('slug') ?? '').trim();
+      let slug = editSlug ?? String(fd.get('slug') ?? '').trim();
       if (slug && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return void (status.textContent = '주소 이름은 영문 소문자·숫자·하이픈만 쓸 수 있어요.');
       // 본문 그림 경로를 정하려면 주소 이름이 먼저 필요하다: 비어 있으면 날짜-임의문자
       if (!slug) slug = `${String(fd.get('date') || new Date().toISOString().slice(0, 10)).replaceAll('-', '')}-${Math.random().toString(16).slice(2, 6)}`;
-      const kind = String(fd.get('kind'));
+      const kind = kindOf();
 
-      const btn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
-      btn.disabled = true;
+      submitBtn.disabled = true;
       try {
         const upload = async (file: File, maxW: number) =>
           api('/api/admin/blob', { method: 'POST', body: JSON.stringify({ data: await shrink(file, maxW) }) }) as Promise<{ sha: string; ext: string }>;
 
         const thumbFile = (fd.get('thumb') as File | null) ?? null;
-        let thumbnail: { sha: string; ext: string } | undefined;
+        let thumbnail: { sha: string; ext: string } | null | undefined;
         if (thumbFile && thumbFile.size) {
           status.textContent = '썸네일 올리는 중…';
           thumbnail = await upload(thumbFile, 1600);
+        } else if (editing && thumbRemove.checked) thumbnail = null;
+
+        const newCount = gallery.filter((g) => 'file' in g).length;
+        let done = 0;
+        const images: ({ keep: string } | { sha: string; ext: string })[] = [];
+        for (const g of gallery) {
+          if ('keep' in g) images.push({ keep: g.keep });
+          else {
+            status.textContent = `이미지 올리는 중… (${++done}/${newCount})`;
+            images.push(await upload(g.file, 2000));
+          }
         }
-        const files = [...(imagesInput.files ?? [])];
-        const images: { sha: string; ext: string }[] = [];
-        for (const [i, f] of files.entries()) {
-          status.textContent = `이미지 올리는 중… (${i + 1}/${files.length})`;
-          images.push(await upload(f, 2000));
-        }
-        // 본문 속 그림: 문서 순서대로 올리고 임시 주소를 실제 경로로 바꾼다
-        const inBody = rich.collectImages();
+
+        let bodyHtml = '';
+        let body = '';
         const bodyImages: { name: string; sha: string }[] = [];
-        const map = new Map<string, string>();
-        for (const [i, it] of inBody.entries()) {
-          status.textContent = `본문 그림 올리는 중… (${i + 1}/${inBody.length})`;
-          const up = await upload(it.file, 2000);
-          const name = `b${String(i + 1).padStart(2, '0')}.${up.ext}`;
-          bodyImages.push({ name, sha: up.sha });
-          map.set(it.src, `/uploads/${kind}/${slug}/${name}`);
+        const markdownMode = editing && loaded?.mode === 'markdown';
+        if (markdownMode) body = mdArea.value;
+        else {
+          // 본문 속 새 그림: 문서 순서대로 올리고 임시 주소를 실제 경로로 바꾼다. 번호는 이미 있는 그림 뒤부터
+          const used = (loaded?.uploads ?? []).map((n) => Number(n.match(/^b(\d+)\./)?.[1] ?? 0));
+          let next = Math.max(0, ...used) + 1;
+          const inBody = rich.collectImages();
+          const map = new Map<string, string>();
+          if (loaded) map.set(loaded.previewPrefix, loaded.uploadPrefix);
+          for (const [i, it] of inBody.entries()) {
+            status.textContent = `본문 그림 올리는 중… (${i + 1}/${inBody.length})`;
+            const up = await upload(it.file, 2000);
+            const name = `b${String(next++).padStart(2, '0')}.${up.ext}`;
+            bodyImages.push({ name, sha: up.sha });
+            map.set(it.src, `/uploads/${kind}/${slug}/${name}`);
+          }
+          bodyHtml = rich.isEmpty() ? '' : rich.htmlWith(map);
         }
+
         status.textContent = '글 저장하는 중…';
         const res = await api('/api/admin/posts', {
-          method: 'POST',
+          method: editing ? 'PUT' : 'POST',
           body: JSON.stringify({
-            kind: fd.get('kind'),
+            kind,
             title,
             subtitle: fd.get('subtitle'),
             date: fd.get('date'),
@@ -483,24 +612,31 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
             role: fd.get('role'),
             tools: fd.get('tools'),
             thumbnailAlt: fd.get('thumbnailAlt'),
-            bodyHtml: rich.isEmpty() ? '' : rich.htmlWith(map),
+            mode: markdownMode ? 'markdown' : 'rich',
+            body,
+            bodyHtml,
             bodyImages,
             thumbnail,
             images,
           }),
         });
-        form.reset();
-        rich.clear();
-        $('[data-previews]', form)!.replaceChildren();
-        syncKind();
-        status.replaceChildren(
-          '올렸어요! 1–2분 뒤 사이트에 나타나요 → ',
-          Object.assign(document.createElement('a'), { href: res.url, textContent: res.url }),
-        );
+        const link = Object.assign(document.createElement('a'), { href: res.url, textContent: res.url });
+        if (editing) {
+          await load();
+          status.replaceChildren('저장했어요! 1–2분 뒤 사이트에 반영돼요 → ', link);
+        } else {
+          form.reset();
+          rich.clear();
+          gallery = [];
+          renderGallery();
+          syncKind();
+          const edit = Object.assign(document.createElement('a'), { href: `/admin?edit=${kind}/${slug}`, textContent: '다시 고치기' });
+          status.replaceChildren('올렸어요! 1–2분 뒤 사이트에 나타나요 → ', link, ' · ', edit);
+        }
       } catch (err) {
         status.textContent = (err as Error).message;
       } finally {
-        btn.disabled = false;
+        submitBtn.disabled = false;
       }
     });
   }
@@ -940,11 +1076,81 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .previews img {
-    width: 96px;
-    height: 64px;
+  .previews :global(li) {
+    display: grid;
+    gap: var(--space-1);
+    width: 132px;
+  }
+  .previews :global(img),
+  .thumb-now img {
+    width: 132px;
+    height: 88px;
     object-fit: cover;
+    background: var(--color-bg);
     border: 1px solid var(--color-border);
+  }
+  .previews :global(.tools) {
+    display: flex;
+  }
+  .previews :global(.tools button) {
+    flex: 1;
+    min-height: var(--tap-min);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+  .previews :global(.tools button:hover) {
+    border-color: var(--color-accent);
+  }
+  .previews :global(.tools button:disabled) {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .thumb-now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+  }
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    font-size: var(--text-caption);
+    cursor: pointer;
+  }
+  .check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-accent);
+  }
+  .edit-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    max-width: 880px;
+    margin-bottom: var(--space-6);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border-left: 2px solid var(--color-accent);
+    font-size: var(--text-caption);
+  }
+  .edit-bar .pixel-label {
+    margin-right: var(--space-2);
+    color: var(--color-accent-light);
+  }
+  .kinds:disabled .kind span {
+    cursor: not-allowed;
+  }
+  .md-box {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .md-box textarea {
+    font-size: 14px;
+    line-height: 1.6;
   }
 
   /* 본문 편집기 */
@@ -1151,7 +1357,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
   }
   .posts li {
     display: grid;
-    grid-template-columns: 130px minmax(0, 1fr) auto auto;
+    grid-template-columns: 130px minmax(0, 1fr) auto auto auto;
     align-items: center;
     gap: var(--space-4);
     padding: var(--space-2) 0;
@@ -1173,11 +1379,13 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
       grid-template-columns: minmax(0, 1fr);
     }
     .posts li {
-      grid-template-columns: minmax(0, 1fr) auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-3);
+      padding: var(--space-3) 0;
     }
-    .posts .kind-l,
-    .posts .caption {
-      grid-column: 1;
+    .posts .t {
+      flex: 1 1 100%;
     }
   }
 </style>

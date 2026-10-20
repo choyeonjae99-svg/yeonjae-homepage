@@ -1,0 +1,85 @@
+---
+/*
+ * 상세 페이지의 주인 전용 도구: 수정 · 지우기.
+ * 방문자에게는 숨겨져 있고, /admin 에서 로그인한 브라우저에서만 보인다(BaseLayout 이 [data-owner-only] 를 연다).
+ * 실제 권한은 서버가 로그인 쿠키로 다시 확인한다.
+ */
+interface Props {
+  kind: 'research' | 'design' | 'writing' | 'drawing';
+  slug: string;
+  title: string;
+  back: string; // 지운 뒤 돌아갈 목록
+}
+const { kind, slug, title, back } = Astro.props;
+---
+
+<div class="owner-tools" data-owner-only hidden>
+  <span class="pixel-label">Owner</span>
+  <a class="btn" href={`/admin?edit=${kind}/${slug}`}>수정</a>
+  <button type="button" class="btn" data-owner-delete data-kind={kind} data-slug={slug} data-title={title} data-back={back}>지우기</button>
+  <p class="caption" role="status" aria-live="polite" data-owner-status></p>
+</div>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const b = document.querySelector<HTMLButtonElement>('[data-owner-delete]');
+    if (!b || b.dataset.ready) return;
+    b.dataset.ready = '1';
+    const status = b.parentElement!.querySelector('[data-owner-status]')!;
+    b.addEventListener('click', async () => {
+      if (!confirm(`「${b.dataset.title}」을(를) 지울까요? 이미지도 함께 지워지고 되돌릴 수 없어요.`)) return;
+      b.disabled = true;
+      status.textContent = '지우는 중…';
+      try {
+        const res = await fetch('/api/admin/posts', {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ kind: b.dataset.kind, slug: b.dataset.slug }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403) throw new Error('로그인이 끝났어요. /admin 에서 다시 로그인해 주세요.');
+        if (!res.ok) throw new Error(data.error || `지우지 못했어요 (${res.status})`);
+        status.textContent = '지웠어요. 1–2분 뒤 사이트에서 사라져요.';
+        setTimeout(() => (location.href = b.dataset.back!), 1500);
+      } catch (err) {
+        status.textContent = (err as Error).message;
+        b.disabled = false;
+      }
+    });
+  });
+</script>
+
+<style>
+  .owner-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-surface);
+    border: 1px dashed var(--color-accent);
+  }
+  .owner-tools .pixel-label {
+    color: var(--color-accent-light);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap-min);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    font-size: var(--text-menu);
+    color: var(--color-text);
+    transition: border-color var(--dur-fast) var(--step-fast);
+  }
+  .btn:hover {
+    border-color: var(--color-accent);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .caption {
+    color: var(--color-accent-light);
+  }
+</style>

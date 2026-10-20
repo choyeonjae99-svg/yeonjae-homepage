@@ -24,7 +24,8 @@
     "@tiptap/starter-kit": "^3.32.0",
     "@upstash/redis": "^1.39.0",
     "astro": "^7.3.5",
-    "sanitize-html": "^2.18.1"
+    "sanitize-html": "^2.18.1",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

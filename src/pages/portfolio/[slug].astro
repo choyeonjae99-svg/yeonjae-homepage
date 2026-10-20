@@ -3,6 +3,7 @@ import type { GetStaticPaths } from 'astro';
 import { Image } from 'astro:assets';
 import { getCollection, render, type CollectionEntry } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import OwnerPostTools from '../../components/OwnerPostTools.astro';
 import { IMAGE_QUALITY, widthsFor } from '../../data/images';
 
 export const getStaticPaths = (async () => {
@@ -55,6 +56,8 @@ const facts = [
       {d.subtitle && <p class="subtitle">{d.subtitle}</p>}
       <p class="lead">{d.summary}</p>
     </header>
+
+    <OwnerPostTools kind={d.category} slug={entry.id} title={d.title} back={back} />
 
     {d.highlights.length > 0 && (
       <ul class="highlights" aria-label="핵심 수치">
