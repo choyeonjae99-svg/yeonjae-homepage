@@ -28,9 +28,11 @@
 /works                그 외 작업물
   ├ 필터: 글 / 그림
   └ /works/[slug]     게시글 상세
+/guestbook            방명록 (방문자가 연락을 남기는 곳)
+/admin                관리자 (주인 전용, 검색 제외) — 올리기 · 방명록 관리 · 박자 맞추기 · 올린 글
 ```
 
-- 메뉴는 **소개 · 포트폴리오 · 그 외 작업물** 세 개만.
+- 메뉴는 **소개 · 포트폴리오 · 그 외 작업물 · 방명록** 네 개. (방명록은 주인 요청으로 추가, 720px 이하는 햄버거 메뉴)
 - 포트폴리오와 그 외 작업물 목록은 **썸네일 카드 그리드** 형식. 카드 = 썸네일 + 제목 + 날짜(또는 기간) + 분류.
 
 ## 3. 디자인 시스템
@@ -120,6 +122,7 @@
   - 주의: 영상 주인이 외부 삽입을 막으면 버튼이 `NO SOUND`로 바뀐다. YouTube 정책상 플레이어를 숨기고 소리만 쓰는 방식은 권장되지 않는다(차단될 가능성 있음). 문제가 생기면 라이선스가 있는 MP3로 돌아간다.
 - **자동재생 금지.** 사운드 버튼을 눌러야 재생.
 - 반복 재생(loop), 켜고 끌 때 짧은 페이드 인/아웃.
+- **박자 동기화:** `src/data/music.json` 의 `bpm`·`offset`(첫 박 시각, 초)·`beatsPerBar` 와 플레이어의 실제 재생 위치로 "지금 몇 번째 박인지" 계산한다(`music.beat()`). 연결망은 박마다 자홍 노드가 하나씩 돌아가며 링을 퍼뜨리고, 마디 첫 박에는 전부 퍼뜨리며, 박 치는 순간 노드가 커지고 신호가 튀어 나간다. 값은 `/admin` → 박자 맞추기에서 음악을 들으며 탭해서 정하고 저장한다.
 
 ## 6. 콘텐츠 관리 방식
 
@@ -146,14 +149,23 @@ summary: 카드에 보일 한 줄 설명
 ---
 ```
 
+### 6-0. 서버 기능 (방명록 · 관리자)
+
+- 사이트는 여전히 정적 페이지가 기본이고, `/admin` 과 `/api/*` 만 Vercel 서버 함수로 돈다(`@astrojs/vercel` 어댑터, 각 파일에 `export const prerender = false`).
+- **Vercel 환경변수:** `ADMIN_PASSWORD`(관리자 비밀번호), `SESSION_SECRET`(16자 이상 임의 문자열), `GITHUB_TOKEN`(fine-grained, 이 저장소만, Contents: Read and write), Upstash Redis(Vercel Marketplace 연동 시 `KV_REST_API_URL`·`KV_REST_API_TOKEN` 자동 등록). 없으면 해당 기능만 "준비 중"으로 뜬다.
+- **방명록:** Redis 에 저장(`src/lib/server/guestbook.ts`). 기본 비공개(주인만 봄), 쓴 사람이 체크하면 공개. 연락처는 항상 주인만. 10분에 3번 제한, 스팸 함정 칸, 글은 텍스트로만 표시. 주인은 `/admin` 에서 답장·공개 전환·삭제.
+- **올리기:** `/admin` 에서 비밀번호 로그인(서명된 httpOnly 쿠키, 15분에 10번 제한) → 이미지는 브라우저에서 줄여(썸네일 1600px, 상세 2000px, WebP) 한 장씩 GitHub blob 으로, 마크다운과 함께 한 커밋으로 `main` 에 올린다(`src/lib/server/github.ts`) → Vercel 재배포(1–2분). 올린 글 삭제도 같은 방식.
+- 쓰기 요청은 모두 같은 출처(Origin)만 받는다. `yj_admin` 쿠키는 화면에 추가 버튼을 보여줄지 정하는 표시용이고 권한이 아니다.
+- 로컬 `npm run dev` 에서는 Redis 가 없으면 메모리에 임시 저장한다.
+
 ### 6-1. 콘텐츠 추가하기 (주인용 추가 버튼)
 
 - 파일: `src/content/portfolio/{research,design}/[slug].md` → `/portfolio/[slug]`, `src/content/works/{writing,drawing}/[slug].md` → `/works/[slug]`. `_` 로 시작하는 파일은 사이트에 안 나온다.
 - 이미지는 같은 이름의 폴더나 같은 폴더에 두고 `./파일이름` 으로 적는다. 썸네일이 없으면 픽셀 무늬가 대신 나온다.
-- **주인 모드:** 어느 페이지든 주소 뒤에 `?edit` 를 붙여 한 번 들어오면 그 브라우저에서만 `[data-owner-only]` 요소(추가 카드)가 보인다. `?edit=off` 로 끈다. 로직은 `BaseLayout.astro`, 카드는 `OwnerAddCard.astro`, GitHub 링크는 `src/data/github.ts`.
+- **주인 표시:** `/admin` 에서 로그인한 브라우저에서만 `[data-owner-only]` 요소(추가 카드)가 보인다. 카드는 `/admin?kind=…` 올리기 화면으로 간다. 로직은 `BaseLayout.astro`, 카드는 `OwnerAddCard.astro`.
 - **추가 카드 위치:** 포트폴리오 → 디자인 탭 끝 / 그 외 작업물 → 목록 끝(글 쓰기 · 그림 파일 올리기 · 그림 소개 쓰기).
-- 카드의 링크는 GitHub의 이미지 업로드 화면과 템플릿이 채워진 새 파일 화면을 연다. 저장(commit)하면 배포가 다시 돈다. 저장소·브랜치는 `src/data/site.ts` 의 `REPO` (배포 브랜치 `main`).
-- 템플릿: `portfolio/design/_template.md`, `works/writing/_template.md`, `works/drawing/_template.md`. 템플릿을 고치지 않고 저장해도 빌드가 깨지지 않게 이미지 줄은 주석으로 둔다.
+- 저장소·브랜치는 `src/data/site.ts` 의 `REPO` (배포 브랜치 `main`).
+- GitHub 에서 직접 추가할 때 쓰는 템플릿: `portfolio/design/_template.md`, `works/writing/_template.md`, `works/drawing/_template.md`.
 - `period` 는 꼭 따옴표로 감싼다(`'2026.01'`). 안 감싸면 YAML 이 숫자로 읽어 `2026.10` → `2026.1` 이 된다.
 - 연구 포트폴리오 썸네일은 핵심 수치를 픽셀 막대그래프로 새로 그린 것(1200×800), 상세 하단 갤러리는 원본 슬라이드(연락처가 있는 표지·끝장 제외).
 
@@ -184,7 +196,8 @@ summary: 카드에 보일 한 줄 설명
 6. [x] 포트폴리오 목록(연구/디자인 탭) + 상세 — `src/pages/portfolio/`, 카드는 `PortfolioCard.astro`
 7. [x] 그 외 작업물 목록(글/그림 필터) + 상세 — `src/pages/works/`, 내용은 `src/content/works/{writing,drawing}/`
 8. [x] 반응형·접근성 점검, 이미지 최적화 — 360~1920px 7개 폭 가로 넘침 0, axe(WCAG 2.1 AA) 위반 0, 터치 영역 44px 이상, 키보드·움직임 줄이기 확인. 공유 이미지 `public/og.png`, 404 페이지
-9. [ ] 배포 + 도메인 연결 — **Vercel** (GitHub `main` 자동 배포). `astro.config.mjs` 의 `site` 는 Vercel 운영 도메인(`VERCEL_PROJECT_PRODUCTION_URL`)을 자동으로 쓰므로, 개인 도메인을 연결하면 다음 배포부터 공유 미리보기 주소도 바뀐다. 따로 지정하려면 `SITE_URL` 환경변수
+9. [x] 배포 — **Vercel** (`yeonjae-homepage.vercel.app`, GitHub `main` 자동 배포). `astro.config.mjs` 의 `site` 는 Vercel 운영 도메인(`VERCEL_PROJECT_PRODUCTION_URL`)을 자동으로 쓰므로, 개인 도메인을 연결하면 다음 배포부터 공유 미리보기 주소도 바뀐다(직접 지정은 `SITE_URL`). 개인 도메인은 아직
+10. [x] 추가 기능 — 방명록(`/guestbook`), 관리자 올리기(`/admin`), 음악 박자 동기화(`src/data/music.json`). 설정은 6-0
 
 ## 10. 아직 받아야 할 자료
 

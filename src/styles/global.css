@@ -1,6 +1,11 @@
 @import './tokens.css';
 
 /* ── 리셋 ─────────────────────────────── */
+/* hidden 속성은 컴포넌트 스타일(display: grid 등)보다 항상 우선한다 */
+[hidden] {
+  display: none !important;
+}
+
 *,
 *::before,
 *::after {

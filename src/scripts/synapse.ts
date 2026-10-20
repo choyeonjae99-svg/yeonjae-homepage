@@ -8,7 +8,8 @@
  *  - 커서 근처 노드가 끌려오고, 커서와 가까운 노드 사이에 임시 연결선이 생긴다.
  *  - 화면 크기에 따라 노드 수·배치를 새로 만든다. 모바일은 노드 수가 적다.
  *  - prefers-reduced-motion 이면 정지 화면 한 장만 그린다.
- *  - setLevel(0–1) / setLevelSource() 로 음악 반응 값을 넣으면 신호 속도와 맥박이 반응한다.
+ *  - setBeatSource() 로 음악의 박 정보를 넣으면 박마다 자홍 노드가 차례로 맥박을 치고
+ *    (마디 첫 박에는 전부), 크기가 커졌다 돌아오며, 신호가 박에 맞춰 튀어 나간다.
  */
 
 type Node = {
@@ -54,6 +55,17 @@ const TAIL_ALPHA = [0.55, 0.25];
 const CURSOR_RADIUS = 170;
 const CURSOR_PULL = 14; // 최대로 끌려가는 거리 (px)
 const CURSOR_LINKS = 3;
+
+/** 음악 박 정보 (music.ts 의 BeatInfo 와 같은 모양) */
+export interface Beat {
+  index: number;
+  phase: number;
+  downbeat: boolean;
+  period: number;
+  strength: number;
+}
+type Ring = { node: number; start: number; dur: number; strong: boolean };
+const BEAT_RING_STEPS = 6;
 
 /** 같은 화면 크기에서는 같은 배치가 나오도록 고정 시드 난수 */
 function mulberry32(seed: number) {
@@ -109,11 +121,33 @@ export class Synapse {
     this.level = Math.max(0, Math.min(1, v));
   }
 
-  /** 매 틱마다 음악 반응 값을 읽어올 함수 */
-  setLevelSource(fn: (() => number) | null) {
-    this.levelSource = fn;
+  /** 매 틱마다 음악 박 정보를 읽어올 함수 (재생 중이 아니면 null 을 돌려준다) */
+  setBeatSource(fn: (() => Beat | null) | null) {
+    this.beatSource = fn;
   }
-  private levelSource: (() => number) | null = null;
+  private beatSource: (() => Beat | null) | null = null;
+  private beat: Beat | null = null;
+  private lastBeat = Number.NaN;
+  private rings: Ring[] = [];
+  private accentOrder: number[] = [];
+
+  /** 박이 칠 때: 강박엔 자홍 노드 전부, 나머지 박엔 하나씩 돌아가며 링을 퍼뜨린다 */
+  private onBeat(b: Beat) {
+    if (!this.accentOrder.length) return;
+    const dur = Math.min(1.2, Math.max(0.35, b.period * 0.95));
+    const targets = b.downbeat
+      ? this.accentOrder
+      : [this.accentOrder[((b.index % this.accentOrder.length) + this.accentOrder.length) % this.accentOrder.length]];
+    for (const node of targets) this.rings.push({ node, start: this.time, dur, strong: b.downbeat });
+  }
+
+  /** 박 직후 1 → 박 끝 0 으로 줄어드는 세기 (끊어지게 4단계) */
+  private kick() {
+    const b = this.beat;
+    if (!b) return 0;
+    const k = Math.pow(1 - b.phase, 3) * b.strength;
+    return Math.round(k * 4) / 4;
+  }
 
   destroy() {
     this.stop();
@@ -270,6 +304,8 @@ export class Synapse {
 
     this.nodes = nodes;
     this.edges = edges;
+    this.accentOrder = nodes.map((n, i) => (n.accent ? i : -1)).filter((i) => i >= 0);
+    this.rings = [];
 
     // 신호: 데스크톱 4개, 모바일 2개. 자홍 노드에서 출발
     const accents = nodes.map((n, i) => (n.accent ? i : -1)).filter((i) => i >= 0);
@@ -318,7 +354,20 @@ export class Synapse {
 
   private update(dt: number) {
     this.time += dt;
-    if (this.levelSource) this.setLevel(this.levelSource());
+
+    // 음악 박: 새 박이 오면 링을 퍼뜨리고, 신호 속도·노드 크기는 kick() 으로 박에 맞춘다
+    this.beat = this.beatSource?.() ?? null;
+    if (this.beat) {
+      if (this.beat.index !== this.lastBeat) {
+        if (!Number.isNaN(this.lastBeat)) this.onBeat(this.beat);
+        this.lastBeat = this.beat.index;
+      }
+      this.setLevel(this.beat.strength);
+    } else {
+      this.lastBeat = Number.NaN;
+      this.setLevel(0);
+    }
+    this.rings = this.rings.filter((r) => this.time - r.start < r.dur);
 
     // 커서 쪽으로 끌려가기 (정지 상태 기준 거리로 계산)
     const p = this.pointer;
@@ -339,8 +388,10 @@ export class Synapse {
       n.oy += (ty - n.oy) * 0.25;
     }
 
-    // 신호 이동 — 음악 볼륨이 클수록 빨라진다
-    const speed = SIGNAL_SPEED * (1 + this.level * 2);
+    // 신호 이동 — 음악이 나오면 박마다 튀어 나갔다가 박 끝에서 느려진다
+    const speed = this.beat
+      ? SIGNAL_SPEED * (0.35 + 3 * this.kick() + 0.4 * (1 - this.beat.strength))
+      : SIGNAL_SPEED;
     for (const s of this.signals) {
       s.dist += speed * dt;
       let a = this.pos(s.from);
@@ -412,16 +463,19 @@ export class Synapse {
       if (!n.accent) ctx.fillRect(px(P[i].x) - NODE / 2, px(P[i].y) - NODE / 2, NODE, NODE);
     });
 
-    // 자홍 노드 + 네모 링 맥박
+    // 자홍 노드 + 네모 링 맥박 (음악이 나오면 박에 맞춰, 아니면 각자 주기대로)
     ctx.fillStyle = colors.accent;
     ctx.strokeStyle = colors.accent;
+    const bump = this.beat ? Math.round(this.kick() * 3) * 2 : 0; // 박 치는 순간 0·2·4·6px 커진다
     this.nodes.forEach((n, i) => {
       if (!n.accent) return;
       const x = px(P[i].x);
       const y = px(P[i].y);
-      ctx.fillRect(x - NODE_ACCENT / 2, y - NODE_ACCENT / 2, NODE_ACCENT, NODE_ACCENT);
-      if (!this.reduced.matches) this.pulse(x, y, n.pulseDelay);
+      const size = NODE_ACCENT + (this.beat && this.rings.some((r) => r.node === i && this.time - r.start < r.dur * 0.5) ? bump : 0);
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      if (!this.reduced.matches && !this.beat) this.pulse(x, y, n.pulseDelay);
     });
+    if (!this.reduced.matches) for (const r of this.rings) this.beatRing(r, P[r.node]);
 
     // 신호 + 꼬리 2개
     for (const s of this.signals) {
@@ -464,6 +518,23 @@ export class Synapse {
     const { ctx } = this;
     ctx.globalAlpha = 0.9 * (1 - u);
     // 2px 테두리를 사각형 4개로 (선 굵기가 흐려지지 않게)
+    ctx.fillRect(x - half, y - half, size, 2);
+    ctx.fillRect(x - half, y + half - 2, size, 2);
+    ctx.fillRect(x - half, y - half, 2, size);
+    ctx.fillRect(x + half - 2, y - half, 2, size);
+    ctx.globalAlpha = 1;
+  }
+
+  /** 박에 맞춘 링: 강박은 더 크게 */
+  private beatRing(r: Ring, p: { x: number; y: number }) {
+    const step = Math.floor(((this.time - r.start) / r.dur) * BEAT_RING_STEPS);
+    const u = Math.min(1, step / BEAT_RING_STEPS);
+    const size = px(NODE_ACCENT * (1 + (r.strong ? 4.5 : 3) * u));
+    const half = px(size / 2);
+    const x = px(p.x);
+    const y = px(p.y);
+    const { ctx } = this;
+    ctx.globalAlpha = (r.strong ? 1 : 0.8) * (1 - u);
     ctx.fillRect(x - half, y - half, size, 2);
     ctx.fillRect(x - half, y + half - 2, size, 2);
     ctx.fillRect(x - half, y - half, 2, size);

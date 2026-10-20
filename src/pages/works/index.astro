@@ -4,7 +4,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageIntro from '../../components/PageIntro.astro';
 import PortfolioCard from '../../components/PortfolioCard.astro';
 import OwnerAddCard from '../../components/OwnerAddCard.astro';
-import { githubNewFile, githubUpload } from '../../data/github';
 import { formatDate } from '../../data/format';
 
 const all = (await getCollection('works', ({ data }) => !data.draft)).sort(
@@ -19,13 +18,10 @@ const FILTERS = [
 const LABEL = { writing: 'Writing', drawing: 'Drawing' } as const;
 const count = (id: string) => (id === 'all' ? all.length : all.filter((e) => e.data.category === id).length);
 
-// 주인 전용 추가 카드: 글 쓰기 / 그림 올리기 + 그림 글 쓰기
-const writingTpl = (await import('../../content/works/writing/_template.md?raw')).default as string;
-const drawingTpl = (await import('../../content/works/drawing/_template.md?raw')).default as string;
+// 주인 전용 추가 카드: 관리자 페이지로
 const addSteps = [
-  { label: '글 쓰기', href: githubNewFile('src/content/works/writing', 'new-writing.md', writingTpl), note: '템플릿이 채워진 새 글' },
-  { label: '그림 파일 올리기', href: githubUpload('src/content/works/drawing'), note: '가로 1600–2000px' },
-  { label: '그림 소개 쓰기', href: githubNewFile('src/content/works/drawing', 'new-drawing.md', drawingTpl), note: '올린 파일 이름을 적어요' },
+  { label: '글 올리기', href: '/admin?kind=writing', note: '마크다운 본문 + 썸네일' },
+  { label: '그림 올리기', href: '/admin?kind=drawing', note: '그림 여러 장 + 설명' },
 ];
 ---
 

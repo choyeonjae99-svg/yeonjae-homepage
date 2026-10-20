@@ -64,7 +64,7 @@ const xCells = [1, 2, 3, 4, 5, 6].flatMap((i) => [
 </div>
 
 <script>
-  const MOBILE = window.matchMedia('(max-width: 640px)');
+  const MOBILE = window.matchMedia('(max-width: 720px)');
 
   function setup() {
     const toggle = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
@@ -256,7 +256,8 @@ const xCells = [1, 2, 3, 4, 5, 6].flatMap((i) => [
       gap: 8px;
     }
   }
-  @media (max-width: 640px) {
+  /* 메뉴 4개가 한 줄에 들어가지 않는 폭부터 햄버거 메뉴 */
+  @media (max-width: 720px) {
     .nav-inline {
       display: none;
     }

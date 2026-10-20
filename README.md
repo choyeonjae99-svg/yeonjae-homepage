@@ -37,3 +37,16 @@ docs/                 디자인 시안
 - 공유 미리보기(Open Graph) 주소는 Vercel 운영 도메인을 자동으로 쓴다.
   개인 도메인을 Vercel 에 연결하면 다음 배포부터 그 도메인이 들어간다.
 - 주소를 직접 정하려면 Vercel 환경변수 `SITE_URL` (예: `https://yeonjae.com`).
+
+## 서버 기능 설정 (방명록 · 관리자)
+
+Vercel 프로젝트 → Settings → Environment Variables 에 넣고 다시 배포한다.
+
+| 이름 | 값 |
+|---|---|
+| `ADMIN_PASSWORD` | `/admin` 로그인 비밀번호 |
+| `SESSION_SECRET` | 16자 이상 아무 문자열 (로그인 쿠키 서명용) |
+| `GITHUB_TOKEN` | GitHub fine-grained token — 이 저장소만, Contents: Read and write |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Vercel → Storage → Upstash Redis 연결 시 자동 등록 |
+
+로컬(`npm run dev`)에서는 Redis 없이도 방명록이 메모리에 임시 저장된다.

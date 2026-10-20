@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import vercel from '@astrojs/vercel';
 
 /**
  * 사이트 절대 주소 (공유 미리보기 이미지·canonical 주소에 쓰인다).
@@ -16,4 +17,7 @@ const site =
 
 export default defineConfig({
   site,
+  // 페이지는 전부 미리 만들어 두고(정적), 방명록·관리자 API 와 /admin 만 서버에서 실행한다
+  output: 'static',
+  adapter: vercel(),
 });

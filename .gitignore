@@ -16,3 +16,6 @@ npm-debug.log*
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# vercel build output
+.vercel/

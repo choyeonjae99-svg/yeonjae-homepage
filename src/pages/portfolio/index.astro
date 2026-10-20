@@ -4,7 +4,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageIntro from '../../components/PageIntro.astro';
 import PortfolioCard from '../../components/PortfolioCard.astro';
 import OwnerAddCard from '../../components/OwnerAddCard.astro';
-import { githubNewFile, githubUpload } from '../../data/github';
 
 const all = (await getCollection('portfolio', ({ data }) => !data.draft)).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime(),
@@ -15,12 +14,9 @@ const TABS = [
   { id: 'design', label: '디자인 포트폴리오', en: 'Design' },
 ] as const;
 
-// 디자인 포트폴리오 추가 (주인 전용): GitHub 에서 템플릿이 채워진 새 파일 화면을 연다
-const dir = 'src/content/portfolio/design';
-const template = (await import('../../content/portfolio/design/_template.md?raw')).default as string;
+// 디자인 포트폴리오 추가 (주인 전용): 관리자 페이지로
 const addSteps = [
-  { label: '이미지 올리기', href: githubUpload(dir), note: '썸네일 3:2 (1200×800)' },
-  { label: '내용 쓰기', href: githubNewFile(dir, 'new-project.md', template), note: '템플릿이 채워진 새 글이 열려요' },
+  { label: '디자인 포트폴리오 올리기', href: '/admin?kind=design', note: '관리자 페이지에서 바로 올려요' },
 ];
 ---
 
