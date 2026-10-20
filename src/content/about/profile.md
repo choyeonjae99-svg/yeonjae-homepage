@@ -1,11 +1,11 @@
 ---
 name: 조연재
-nameEn: Cho Yeonjae
+nameEn: ChoYeonjae
 headline: 콘텐츠 플레이어의 경험을 연구합니다.
 photo: ./profile.jpg
 photoAlt: 조연재 프로필 사진
 email: skyyeonjae@naver.com
-interests: [플레이어 경험, 게임 연구, 메타버스·아바타, 사용자 연구, 시각 디자인]
+interests: [ 플레이어 경험, 게임 연구, 메타버스·아바타, 사용자 연구, 시각 디자인 ]
 ---
 
 설문, 인터뷰, 커뮤니티 게시판 크롤링 등의 방법으로 게시글·텍스트 데이터 3,788건과 플레이어 316명의 경험을 연구하고 분석해 결론을 도출해 왔습니다.
