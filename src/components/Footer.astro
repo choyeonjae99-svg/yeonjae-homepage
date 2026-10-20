@@ -9,11 +9,8 @@ const { variant = 'page' } = Astro.props;
 const year = new Date().getFullYear();
 ---
 
-{variant === 'home' ? (
-  <footer class="site-footer home" data-footer>
-    <span class="pixel-label scroll" aria-hidden="true">Scroll</span>
-  </footer>
-) : (
+{/* 메인 화면에는 푸터를 두지 않는다 (예전 SCROLL 표시는 주인 요청으로 뺐다) */}
+{variant === 'page' && (
   <footer class="site-footer page" data-footer>
     <span class="caption">© {year} {SITE.name}</span>
     <a class="caption mail" href={`mailto:${SITE.email}`}>{SITE.email}</a>
@@ -27,14 +24,6 @@ const year = new Date().getFullYear();
     align-items: center;
     justify-content: space-between;
     gap: var(--space-5);
-  }
-  .site-footer.home {
-    justify-content: flex-end;
-    position: fixed;
-    left: var(--gutter);
-    right: var(--gutter);
-    bottom: calc(var(--edge-bottom) + env(safe-area-inset-bottom, 0px));
-    z-index: 10;
   }
   .site-footer.page {
     flex-wrap: wrap;
@@ -62,9 +51,6 @@ const year = new Date().getFullYear();
   }
 
   @media (max-width: 640px) {
-    .scroll {
-      display: none;
-    }
     .site-footer.page {
       flex-direction: column;
       align-items: flex-start;
