@@ -14,7 +14,7 @@ export interface PreviewData {
   tools: string[];
   thumbUrl: string | null;
   thumbAlt: string;
-  images: string[];
+  images: { url: string; size: string }[];
   bodyHtml: string;
 }
 
@@ -93,18 +93,25 @@ export function renderPreview(root: HTMLElement, d: PreviewData) {
     art.append(layout);
   } else {
     // 글: 썸네일을 표지로 / 그림: 그림 모음(없으면 썸네일)을 크게
-    const figures = d.kind === 'drawing' ? (d.images.length ? d.images : d.thumbUrl ? [d.thumbUrl] : []) : [];
+    // 실제 페이지처럼: 그림 모음이 있으면 크게(크기 선택 반영), 그림 작업물은 없으면 썸네일을
+    const figures = d.images.length ? d.images : d.kind === 'drawing' && d.thumbUrl ? [{ url: d.thumbUrl, size: 'original' }] : [];
     if (d.kind === 'writing' && d.thumbUrl) art.append(img(d.thumbUrl, d.thumbAlt, 'pv-cover'));
-    figures.forEach((src, i) => art.append(img(src, `${title} ${i + 1}`, 'pv-figure')));
+    figures.forEach((f, i) => {
+      const el = img(f.url, `${title} ${i + 1}`, 'pv-figure');
+      el.dataset.size = f.size;
+      art.append(el);
+    });
     art.append(body);
   }
-  if (d.images.length && d.kind !== 'drawing') {
+  if (d.images.length && portfolio) {
     const g = h('section', 'pv-gallery');
     g.append(h('p', 'pixel-label', portfolio ? '이미지' : 'Images'));
     const ol = h('ol');
-    d.images.forEach((src, i) => {
+    d.images.forEach((f, i) => {
       const li = h('li');
-      li.append(img(src, `${title} 이미지 ${i + 1}`));
+      const el = img(f.url, `${title} 이미지 ${i + 1}`, 'pv-figure');
+      el.dataset.size = f.size;
+      li.append(el);
       ol.append(li);
     });
     g.append(ol);

@@ -60,7 +60,13 @@ export interface Post {
   bodyHtml?: string;
   thumbExt?: ImageExt;
   imageExts: ImageExt[];
+  /** 그림 모음 각각의 크기 (images 와 같은 순서) */
+  imageSizes?: string[];
 }
+
+export const GALLERY_SIZES = ['original', 'small', 'medium', 'full'] as const;
+/** 크기 목록: 하나라도 원본이 아닐 때만 저장한다 */
+export const sizesOrUndefined = (sizes: string[]) => (sizes.some((x) => x !== 'original') ? sizes : undefined);
 
 /** 마크다운 파일 내용 만들기 */
 export function buildMarkdown(p: Post) {
@@ -80,6 +86,8 @@ export function buildMarkdown(p: Post) {
     lines.push('images:');
     p.imageExts.forEach((ext, i) => lines.push(`  - ${y(`./${p.slug}/${String(i + 1).padStart(2, '0')}.${ext}`)}`));
     if (isPortfolio) lines.push(`imagesCaption: ${y('이미지')}`);
+    const sizes = sizesOrUndefined(p.imageSizes ?? []);
+    if (sizes) lines.push(`imageSizes: ${y(sizes)}`);
   }
   // 편집기 본문은 한 줄짜리 <div class="rich"> 로 넣어 마크다운이 건드리지 않게 한다
   const body = p.bodyHtml ? `<div class="rich">${p.bodyHtml}</div>` : p.body.trim();
@@ -116,7 +124,7 @@ export function rewriteMarkdown(fm: string, changes: Record<string, unknown>, bo
     else {
       const node = doc.createNode(v);
       // 짧은 글자 목록(태그·도구)은 한 줄로
-      if (Array.isArray(v) && (k === 'tags' || k === 'tools')) (node as { flow?: boolean }).flow = true;
+      if (Array.isArray(v) && (k === 'tags' || k === 'tools' || k === 'imageSizes')) (node as { flow?: boolean }).flow = true;
       doc.set(k, node);
     }
   }

@@ -10,3 +10,7 @@ export const widthsFor = (img: ImageMetadata, candidates: number[]) => [
 
 /** 그림 화질: 선이 많은 드로잉도 뭉개지지 않게 높게 */
 export const IMAGE_QUALITY = 90;
+
+/** 그림 크기: 원본 / 작게 40% / 중간 70% / 꽉 차게 (화면 폭 대비, 원본보다 크게 늘리지 않음) */
+export const IMAGE_SIZES = ['original', 'small', 'medium', 'full'] as const;
+export type ImageSize = (typeof IMAGE_SIZES)[number];
