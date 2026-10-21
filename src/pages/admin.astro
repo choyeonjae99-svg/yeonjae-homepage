@@ -255,6 +255,8 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
               <div data-editor></div>
             </div>
             <p class="status" role="status" aria-live="polite" data-editor-notice></p>
+            <p class="char-count" data-char-count>글자 수 <b>0</b>자 · 공백 제외 <b>0</b>자</p>
+            <p class="hint"><kbd>Tab</kbd> 들여쓰기 · <kbd>Shift</kbd>+<kbd>Tab</kbd> 내어쓰기 (목록에서는 한 단계 안/밖으로) · 편집기에서 빠져나갈 때는 <kbd>Esc</kbd></p>
             <p class="hint" data-editor-hint>그림은 끌어다 놓거나 붙여 넣어도 들어가요. 그림을 누르면 크기를 고를 수 있고, 끌어서 위치를 옮길 수 있어요. 원본 크기보다 크게 늘어나지 않아요.</p>
           </div>
 
@@ -435,7 +437,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
 
 <script>
   import { music } from '../scripts/music';
-  import { createEditor } from '../scripts/editor';
+  import { INDENT, countChars, createEditor } from '../scripts/editor';
   import { markdownToHtml, renderPreview } from '../scripts/preview';
 
   const $ = <T extends Element = HTMLElement>(s: string, root: ParentNode = document) => root.querySelector<T>(s);
@@ -559,7 +561,16 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     syncKind();
 
     const notice = $('[data-editor-notice]', form)!;
-    const rich = createEditor($('[data-editor]', form)!, $('[data-toolbar]', form)!, undefined, (msg) => (notice.textContent = msg));
+    // 글자 수 (주인만 보는 관리자 화면에만 있다)
+    const countEl = $('[data-char-count]', form)!;
+    const showCount = () => {
+      const md = editing && loaded?.mode === 'markdown';
+      const c = md ? countChars(mdArea.value) : rich.count();
+      const [a, b] = countEl.querySelectorAll('b');
+      a.textContent = c.all.toLocaleString('ko-KR');
+      b.textContent = c.noSpace.toLocaleString('ko-KR');
+    };
+    const rich = createEditor($('[data-editor]', form)!, $('[data-toolbar]', form)!, () => showCount(), (msg) => (notice.textContent = msg));
     const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
 
     // ── 글 아래 그림 모음: 남길 그림(이미 올린 것) + 새 그림. 순서 바꾸기·빼기 ──
@@ -628,6 +639,22 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     const thumbRemove = $<HTMLInputElement>('[data-thumb-remove]', form)!;
     const mdBox = $('[data-md-box]', form)!;
     const mdArea = $<HTMLTextAreaElement>('[data-markdown]', form)!;
+    mdArea.addEventListener('input', showCount);
+    // 마크다운 칸에서도 Tab = 들여쓰기 (전각 공백이라 마크다운 코드 블록으로 바뀌지 않는다)
+    mdArea.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') return void (form.querySelector<HTMLButtonElement>('[data-preview-open]')?.focus());
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      const { selectionStart: st, selectionEnd: en, value } = mdArea;
+      if (!e.shiftKey) {
+        mdArea.setRangeText(INDENT, st, en, 'end');
+      } else {
+        const lineStart = value.lastIndexOf('\n', st - 1) + 1;
+        const m = value.slice(lineStart).match(/^\u3000{1,2}/);
+        if (m) mdArea.setRangeText('', lineStart, lineStart + m[0].length, 'start');
+      }
+      showCount();
+    });
     const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
     // ── 명화에서 고른 썸네일 (파일을 직접 고르면 그쪽이 우선) ──
@@ -721,6 +748,7 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
         $('[data-editor-hint]', form)!.hidden = md;
         if (md) mdArea.value = d.body;
         else rich.setHTML(d.body);
+        showCount();
         status.textContent = '';
         submitBtn.disabled = false;
       } catch (err) {
@@ -1758,6 +1786,16 @@ const fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll('-', '.');
     border: 1px solid var(--color-border);
     background: none;
     cursor: pointer;
+  }
+  .char-count {
+    justify-self: end;
+    font-size: var(--text-caption);
+    color: var(--color-text-muted);
+  }
+  .char-count b {
+    font-weight: var(--font-weight);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
   }
   .img-tools .hint {
     margin: 0 var(--space-1);

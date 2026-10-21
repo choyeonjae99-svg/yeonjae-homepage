@@ -16,6 +16,21 @@ const FILTERS = [
   { id: 'drawing', label: '그림' },
 ] as const;
 const LABEL = { writing: 'Writing', drawing: 'Drawing' } as const;
+const writings = all.filter((e) => e.data.category === 'writing');
+const drawings = all.filter((e) => e.data.category === 'drawing');
+
+// 책등: 글마다 색·두께·높이를 조금씩 다르게 (id 로 정해서 매번 같다). 색은 모두 사이트 색
+const SPINE_COLORS = ['wine', 'cream', 'gray', 'pink', 'dark'] as const;
+const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7) >>> 0;
+const spine = (id: string, title: string) => {
+  const h = hash(id);
+  return {
+    color: SPINE_COLORS[h % SPINE_COLORS.length],
+    // 제목이 길면 두껍게 (세로 글자가 두 줄까지 들어가게)
+    width: title.length > 14 ? 76 : title.length > 8 ? 60 : [48, 52, 56][h % 3],
+    height: [248, 264, 280, 296][(h >> 3) % 4],
+  };
+};
 const count = (id: string) => (id === 'all' ? all.length : all.filter((e) => e.data.category === id).length);
 
 // 주인 전용 추가 카드: 관리자 페이지로
@@ -39,20 +54,53 @@ const addSteps = [
 
   <p class="empty caption" data-empty hidden={all.length > 0}>아직 올린 작업물이 없습니다.</p>
 
-  <ul class="grid" aria-live="polite">
-    {all.map(({ id, data }) => (
-      <li data-cat={data.category}>
-        <PortfolioCard
-          href={`/works/${id}`}
-          title={data.title}
-          label={LABEL[data.category]}
-          period={formatDate(data.date)}
-          summary={data.summary}
-          thumbnail={data.thumbnail}
-          thumbnailAlt={data.thumbnailAlt}
-        />
-      </li>
-    ))}
+  <!-- 글: 책장에 꽂힌 책등 -->
+  {writings.length > 0 && (
+    <section class="part" data-part="writing" aria-labelledby="part-writing">
+      <h2 class="part-head" id="part-writing"><span class="pixel-label">Writing</span><span class="ko">글</span></h2>
+      <ul class="shelf">
+        {writings.map(({ id, data }) => {
+          const sp = spine(id, data.title);
+          return (
+            <li class="slot" style={`--w:${sp.width}px;--h:${sp.height}px`}>
+              <a class="spine" data-color={sp.color} href={`/works/${id}`} title={data.summary || data.title}>
+                <span class="band" aria-hidden="true"></span>
+                <span class="spine-title">{data.title}</span>
+                <span class="mark" aria-hidden="true"></span>
+                <span class="spine-year pixel-label">
+                  <span class="visually-hidden">, </span>{formatDate(data.date).slice(2, 7)}
+                </span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  )}
+
+  <!-- 그림: 썸네일 카드 -->
+  {drawings.length > 0 && (
+    <section class="part" data-part="drawing" aria-labelledby="part-drawing">
+      <h2 class="part-head" id="part-drawing"><span class="pixel-label">Drawing</span><span class="ko">그림</span></h2>
+      <ul class="grid">
+        {drawings.map(({ id, data }) => (
+          <li>
+            <PortfolioCard
+              href={`/works/${id}`}
+              title={data.title}
+              label={LABEL[data.category]}
+              period={formatDate(data.date)}
+              summary={data.summary}
+              thumbnail={data.thumbnail}
+              thumbnailAlt={data.thumbnailAlt}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  <ul class="grid owner-add-row">
     <OwnerAddCard title="작업물 추가" steps={addSteps} />
   </ul>
 </BaseLayout>
@@ -62,15 +110,16 @@ const addSteps = [
     const group = document.querySelector<HTMLElement>('[data-filters]');
     if (!group) return;
     const buttons = [...group.querySelectorAll<HTMLButtonElement>('[data-filter]')];
-    const items = [...document.querySelectorAll<HTMLElement>('.grid > li[data-cat]')];
+    const parts = [...document.querySelectorAll<HTMLElement>('[data-part]')];
     const empty = document.querySelector<HTMLElement>('[data-empty]');
 
+    // 전체: 책장 + 그림 카드 / 글: 책장만 / 그림: 카드만
     const apply = (id: string) => {
       buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === id)));
       let shown = 0;
-      items.forEach((li) => {
-        const on = id === 'all' || li.dataset.cat === id;
-        li.hidden = !on;
+      parts.forEach((part) => {
+        const on = id === 'all' || part.dataset.part === id;
+        part.hidden = !on;
         if (on) shown++;
       });
       if (empty) empty.hidden = shown > 0;
@@ -126,6 +175,142 @@ const addSteps = [
   .empty {
     padding-bottom: var(--space-5);
   }
+  .part {
+    display: grid;
+    gap: var(--space-4);
+    margin-bottom: var(--space-8);
+  }
+  .part-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    font-size: var(--text-body);
+  }
+  .part-head .ko {
+    color: var(--color-text);
+  }
+
+  /* ── 책장 ──
+   * 줄마다 높이(--row)가 같고, 각 줄 바닥에 선반(픽셀 판자)이 반복된다.
+   * 책은 바닥에 붙어 서 있고 높이·두께·색이 조금씩 다르다. */
+  .shelf {
+    --row: 336px;
+    --board: 14px;
+    list-style: none;
+    margin: 0;
+    padding: var(--space-5) var(--space-5) 0;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 4px;
+    row-gap: 0;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0 calc(var(--row) - var(--board)),
+        var(--color-dot) calc(var(--row) - var(--board)) calc(var(--row) - var(--board) + 2px),
+        var(--color-border) calc(var(--row) - var(--board) + 2px) var(--row)
+      ),
+      radial-gradient(var(--color-grid) 1px, transparent 1.5px) 0 0 / 8px 8px,
+      var(--color-surface);
+    background-origin: content-box, padding-box, padding-box;
+    background-clip: content-box, padding-box, padding-box;
+    border: 2px solid var(--color-border);
+    border-bottom: 0;
+  }
+  .slot {
+    display: flex;
+    align-items: flex-end;
+    height: var(--row);
+    padding-bottom: var(--board);
+  }
+  .spine {
+    --paper: var(--color-accent-deep);
+    --ink: var(--color-text);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    width: var(--w);
+    height: var(--h);
+    padding: var(--space-5) 0 var(--space-3);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow:
+      inset 3px 0 0 rgb(255 255 255 / 0.12),
+      inset -4px 0 0 rgb(0 0 0 / 0.25),
+      3px 0 0 rgb(0 0 0 / 0.35);
+    transition: transform var(--dur-fast) steps(2);
+  }
+  .spine[data-color='cream'] {
+    --paper: var(--color-text);
+    --ink: var(--color-bg);
+  }
+  .spine[data-color='gray'] {
+    --paper: var(--color-node);
+    --ink: var(--color-bg);
+  }
+  .spine[data-color='pink'] {
+    --paper: var(--color-accent-light);
+    --ink: var(--color-bg);
+  }
+  .spine[data-color='dark'] {
+    --paper: var(--color-bg);
+    --ink: var(--color-text);
+    outline: 1px solid var(--color-dot);
+    outline-offset: -1px;
+  }
+  /* 꺼내 보는 느낌: 위로 살짝 */
+  .spine:hover,
+  .spine:focus-visible {
+    transform: translateY(-12px);
+  }
+  .spine:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  /* 책등 위아래 띠 (픽셀) */
+  .band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 10px;
+    height: 4px;
+    border-top: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    opacity: 0.55;
+  }
+  .mark {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: var(--color-accent);
+  }
+  .spine[data-color='pink'] .mark,
+  .spine[data-color='wine'] .mark {
+    background: var(--ink);
+  }
+  .spine-title {
+    flex: 1;
+    min-height: 0;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 14px;
+    line-height: 1.45;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    padding-top: var(--space-2);
+  }
+  .spine-year {
+    color: var(--ink);
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+  .owner-add-row {
+    margin-top: calc(var(--space-8) * -1 + var(--space-4));
+  }
   .grid {
     list-style: none;
     margin: 0;
@@ -139,5 +324,21 @@ const addSteps = [
   }
   .grid > li[hidden] {
     display: none;
+  }
+
+  @media (max-width: 640px) {
+    .shelf {
+      --row: 290px;
+      padding: var(--space-4) var(--space-3) 0;
+      column-gap: 3px;
+    }
+    .spine {
+      width: calc(var(--w) * 0.85);
+      height: calc(var(--h) * 0.85);
+    }
+    .spine-title {
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
   }
 </style>

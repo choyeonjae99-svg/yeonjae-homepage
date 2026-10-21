@@ -4,7 +4,7 @@
  * 그림은 편집 중에는 브라우저 안의 임시 주소(blob:)로 보여주고,
  * 올릴 때 collectImages() 로 문서 순서대로 모아 실제 파일로 올린 뒤 주소를 바꾼다.
  */
-import { Editor } from '@tiptap/core';
+import { Editor, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle, Color, BackgroundColor, FontSize } from '@tiptap/extension-text-style';
 import TextAlign from '@tiptap/extension-text-align';
@@ -30,6 +30,59 @@ const SizedImage = Image.extend({
   },
 }).configure({ inline: false, allowBase64: false });
 
+/** 들여쓰기 한 번 = 전각 공백 두 칸 (일반 공백과 달리 화면에서 줄어들지 않는다) */
+export const INDENT = '\u3000\u3000';
+
+/**
+ * 키보드: Tab 들여쓰기 · Shift+Tab 내어쓰기 (목록 안에서는 한 단계 안/밖으로).
+ * Tab 이 편집기에 묶이므로 Esc 를 누르면 편집기 다음 칸으로 빠져나간다 (키보드 사용자용).
+ */
+const TabIndent = Extension.create({
+  name: 'tabIndent',
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        if (this.editor.isActive('listItem')) {
+          this.editor.commands.sinkListItem('listItem');
+          return true;
+        }
+        return this.editor.commands.insertContent(INDENT);
+      },
+      'Shift-Tab': () => {
+        if (this.editor.isActive('listItem')) {
+          this.editor.commands.liftListItem('listItem');
+          return true;
+        }
+        const { state } = this.editor;
+        const { from, empty, $from } = state.selection;
+        if (!empty) return true;
+        // 문단 맨 앞 또는 커서 바로 앞의 들여쓰기를 지운다
+        const lineStart = $from.start();
+        const head = state.doc.textBetween(lineStart, from, '\n');
+        const atStart = head.match(/^\u3000{1,2}/);
+        const beforeCursor = head.match(/\u3000{1,2}$/);
+        if (beforeCursor) this.editor.commands.deleteRange({ from: from - beforeCursor[0].length, to: from });
+        else if (atStart) this.editor.commands.deleteRange({ from: lineStart, to: lineStart + atStart[0].length });
+        return true;
+      },
+      Escape: () => {
+        const root = this.editor.view.dom;
+        const all = [...document.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])')];
+        const next = all.find((el) => !root.contains(el) && root.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING && el.offsetParent !== null);
+        next?.focus();
+        return true;
+      },
+    };
+  },
+});
+
+/** 글자 수 (줄바꿈은 빼고 셈) */
+export function countChars(text: string) {
+  const t = text.replace(/\n/g, '');
+  return { all: t.length, noSpace: t.replace(/[\s\u3000]/g, '').length };
+}
+
 export const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px'];
 
 export interface RichEditor {
@@ -42,6 +95,8 @@ export interface RichEditor {
   clear(): void;
   /** 이미 저장된 본문을 불러온다 (수정) */
   setHTML(html: string): void;
+  /** 지금 본문 글자 수 */
+  count(): { all: number; noSpace: number };
 }
 
 export function createEditor(
@@ -68,6 +123,7 @@ export function createEditor(
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       SizedImage,
       Placeholder.configure({ placeholder: '여기에 본문을 쓰세요' }),
+      TabIndent,
     ],
     editorProps: {
       attributes: { class: 'prose rich editor-surface', 'aria-label': '본문', role: 'textbox', 'aria-multiline': 'true' },
@@ -218,11 +274,14 @@ export function createEditor(
       editor.commands.clearContent();
       files.forEach((_, src) => URL.revokeObjectURL(src));
       files.clear();
+      onChange?.();
     },
     setHTML: (html: string) => {
       files.forEach((_, src) => URL.revokeObjectURL(src));
       files.clear();
       editor.commands.setContent(html, { emitUpdate: false });
+      onChange?.();
     },
+    count: () => countChars(editor.getText({ blockSeparator: '\n' })),
   };
 }
